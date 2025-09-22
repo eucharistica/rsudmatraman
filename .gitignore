@@ -1,0 +1,89 @@
+# ===== OS / Editor cruft =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+*.swp
+*.swo
+*.orig
+*.bak
+*.tmp
+*.temp
+*.log
+*.lock
+
+# VS Code / JetBrains / others
+.vscode/
+.idea/
+*.iml
+*.sublime-*
+.vscode-test/
+
+# ===== Node / Frontend build =====
+node_modules/
+.npm/
+.pnp.*
+.cache/
+dist/
+build/
+*.tsbuildinfo
+
+# Tailwind/Parcel/Vite/etc. caches
+*.map
+*.gz
+*.br
+
+# ===== PHP / Composer (opsional, hapus jika tidak pakai) =====
+vendor/
+composer.lock
+composer.phar
+.phpunit.result.cache
+phpunit.xml
+phpunit.xml.dist
+coverage/
+
+# ===== Runtime / uploads / temp =====
+storage/
+tmp/
+temp/
+cache/
+logs/
+*.sql
+*.sqlite
+*.sqlite3
+
+# ===== Konfigurasi rahasia / environment =====
+.env
+.env.*
+!.env.example
+
+# Private config kamu
+/_private/*
+!/_private/README.md
+!/_private/*.example.php
+
+# ===== Image/asset build intermediates (opsional) =====
+*.psd
+*.ai
+*.sketch
+
+# ===== OS/Win exec =====
+*.exe
+*.dll
+*.cmd
+*.bat
+
+# ===== Archives =====
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+
+# ===== IDE PHPStorm deployment cache =====
+.idea/**/deployment.xml
+
+# ===== Misc =====
+exports/
+imports/
+/api-website/_private

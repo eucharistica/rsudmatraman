@@ -1,0 +1,24 @@
+# /.htaccess — aturan umum
+Options -Indexes
+RewriteEngine On
+RewriteBase /
+
+# jangan rewrite jika file/dir memang ada
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png  "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType text/css   "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+</IfModule>
+FileETag None
+Header unset ETag
+
+SetEnv APP_DEBUG 1
+# Blokir akses folder _private
+RedirectMatch 404 ^/_private/
