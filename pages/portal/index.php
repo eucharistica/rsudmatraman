@@ -180,8 +180,6 @@ function role_badge(string $r): string {
     </section>
   </main>
 
-  <footer class="border-t border-gray-200 bg-white/70 py-6 text-center text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
-    © <script>document.write(new Date().getFullYear())</script> RSUD Matraman
-  </footer>
+  <?php include dirname(__DIR__, 3) . '/partials/footer-app.php'; ?>
 </body>
 </html>

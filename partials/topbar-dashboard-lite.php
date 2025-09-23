@@ -38,7 +38,7 @@ $DEFAULT_MENU = [
     ['text' => 'Pengguna & Role', 'href' => '/pages/admin/users'],
     ['text' => 'Audit Log',       'href' => '/pages/admin/audit'],
     ['text' => 'Integrasi API',   'href' => '/pages/admin/integrasi'],
-    ['text' => 'Konfigurasi',     'href' => '/pages/admin/konfigurasi'],
+    ['text' => 'Konfigurasi',     'href' => '/pages/admin/config'],
   ],
 ];
 $MENU = array_replace_recursive($DEFAULT_MENU, $TOPBAR_MENU);

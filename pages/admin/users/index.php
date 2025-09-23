@@ -212,5 +212,6 @@ $csrf = $_SESSION['csrf'];
       }
     }
   </script>
+  <?php include dirname(__DIR__, 3) . '/partials/footer-app.php'; ?>
 </body>
 </html>
