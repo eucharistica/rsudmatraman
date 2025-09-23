@@ -13,6 +13,6 @@ $pageDescription = 'Informasi ketersediaan tempat tidur rawat inap RSUD Matraman
   <?php include __DIR__ . '/../../partials/header.php'; ?>
   <?php include __DIR__ . '/../../assets/components/jambesuk-widget.php'; ?>
   <?php include __DIR__ . '/../../assets/components/rooms-widget.php'; ?>
-  <?php include __DIR__ . '/../../partials/footer.php'; ?>
+  <?php include dirname(__DIR__, 2) . '/partials/footer-app.php'; ?>
 </body>
 </html>

@@ -48,9 +48,6 @@ $csrf = $_SESSION['csrf'];
   <title>Dashboard — Kelola Pengguna</title>
   <meta name="theme-color" content="#38bdf8" />
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script>
-    tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#38bdf8'},boxShadow:{soft:'0 10px 30px -10px rgba(0,0,0,.25)'}}}}
-  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
@@ -142,10 +139,6 @@ $csrf = $_SESSION['csrf'];
     </div>
   </main>
 
-  <footer class="border-t border-gray-200 bg-white/70 py-6 text-center text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
-    © <script>document.write(new Date().getFullYear())</script> RSUD Matraman
-  </footer>
-
   <script>
     function userRolePage(roles, users, csrf){
       return {
@@ -203,10 +196,9 @@ $csrf = $_SESSION['csrf'];
             // sukses → commit _orig
             u._orig = JSON.parse(JSON.stringify({id:u.id,name:u.name,email:u.email,roles:u.roles,status:u.status}));
             u._dirty = false;
-            this.flashOk = true; this.flash = 'Tersimpan ✓'; setTimeout(()=>this.flash='', 2000);
+            toast.success('Update role berhasil');
           }catch(e){
-            this.flashOk = false; this.flash = e.message || 'Gagal menyimpan';
-            setTimeout(()=>this.flash='', 4000);
+            toast.error(e.message || 'Gagal menyimpan');
           }
         }
       }

@@ -24,13 +24,6 @@ $CSRF = $_SESSION['csrf'];
       <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lengkapi Profil — RSUD Matraman</title>
-
-<script>
-  tailwind.config = {
-    darkMode: 'class',
-    theme: { extend: { colors: { primary: '#38bdf8' } } }
-  }
-</script>
 <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
 
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>

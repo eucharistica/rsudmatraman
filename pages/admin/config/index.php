@@ -15,33 +15,6 @@ $csrf = $_SESSION['csrf'];
   <link rel="icon" href="/assets/img/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="/assets/components/css/tw.css">
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>[x-cloak]{display:none!important}</style>
-  <script>
-  (() => {
-    function defineToastStore() {
-      if (!window.Alpine) return;
-      try {
-        Alpine.store('toast', {
-          list: [],
-          push(message, { type='info', title='', icon='', timeout=3500 } = {}) {
-            const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-            this.list.push({ id, type, title, icon, message });
-            if (timeout > 0) setTimeout(() => this.remove(id), timeout);
-          },
-          success(msg, opts={}) { this.push(msg, { type:'success', title:'Berhasil', ...opts }); },
-          error(msg,   opts={}) { this.push(msg, { type:'error',   title:'Gagal',    ...opts }); },
-          info(msg,    opts={}) { this.push(msg, { type:'info',    title:'Info',     ...opts }); },
-          warn(msg,    opts={}) { this.push(msg, { type:'warn',    title:'Perhatian',...opts }); },
-          remove(id) { this.list = this.list.filter(x => x.id !== id); },
-          clear() { this.list = []; }
-        });
-      } catch {}
-    }
-    document.addEventListener('alpine:init', defineToastStore);
-    if (window.Alpine) defineToastStore();
-    window.addEventListener('DOMContentLoaded', () => { if (window.Alpine) defineToastStore(); });
-  })();
-  </script>
 </head>
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100"
       x-data="configPage('<?= htmlspecialchars($csrf, ENT_QUOTES) ?>')"
@@ -186,7 +159,7 @@ $csrf = $_SESSION['csrf'];
             this.form = Object.assign({'smtp.enabled': false}, j.data || {});
             this.form['smtp.enabled'] = (this.form['smtp.enabled']==='1' || this.form['smtp.enabled']===1 || this.form['smtp.enabled']===true);
           }catch(e){
-            Alpine.store('toast').error(e.message || 'Gagal memuat');
+            vtoast.error(e.message || 'Gagal memuat');
           }
         },
 
@@ -207,9 +180,9 @@ $csrf = $_SESSION['csrf'];
             const txt = await r.text();
             let j; try { j = JSON.parse(txt); } catch { throw new Error('Respon bukan JSON: '+txt.slice(0,200)); }
             if(!j.ok) throw new Error(j.message||j.error||'Gagal menyimpan');
-            Alpine.store('toast').success('Konfigurasi tersimpan ✓');
+            toast.success('Konfigurasi tersimpan');
           }catch(e){
-            Alpine.store('toast').error(e.message || 'Gagal menyimpan');
+            toast.error(e.message || 'Gagal menyimpan');
           }
         },
 
@@ -227,9 +200,9 @@ $csrf = $_SESSION['csrf'];
             let j; try { j = JSON.parse(text); } catch { throw new Error('Respon bukan JSON: ' + text.slice(0, 200)); }
             if (!j.ok) throw new Error(j.message || j.error || 'Gagal mengirim email tes');
 
-            Alpine.store('toast').success('Email tes terkirim ke ' + to);
+            vtoast.success('Email tes terkirim ke ' + to);
           } catch(e){
-            Alpine.store('toast').error(e.message || 'Gagal kirim email tes');
+            vtoast.error(e.message || 'Gagal kirim email tes');
           } finally {
             this.testing = false;
           }

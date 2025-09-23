@@ -1,43 +1,37 @@
 <?php
 declare(strict_types=1);
-
-// Partial LITE: tidak memuat Tailwind/Alpine lagi.
-// Pastikan halaman pemanggil sudah memuat session_boot() & CDN.
+// Partial LITE: pastikan halaman pemanggil sudah memuat Tailwind & Alpine.
 require_once __DIR__ . '/../lib/auth.php';
 
-$u    = auth_current_user();              // array|null
-$role = auth_role();                      // 'admin'|'editor'|'user'|null
+$u    = auth_current_user();
+$role = auth_role();
 
-$TOPBAR_BRAND      = $TOPBAR_BRAND      ?? 'RSUD Matraman';
-$TOPBAR_SUBTITLE   = $TOPBAR_SUBTITLE   ?? 'Portal';
-$TOPBAR_HOME_HREF  = $TOPBAR_HOME_HREF  ?? '/';
-$TOPBAR_LOGO_TEXT  = $TOPBAR_LOGO_TEXT  ?? 'RS';
-$TOPBAR_MAX_WIDTH  = $TOPBAR_MAX_WIDTH  ?? 'max-w-7xl';
-$TOPBAR_STICKY     = $TOPBAR_STICKY     ?? true;
-$TOPBAR_MENU       = $TOPBAR_MENU       ?? [];
+$TOPBAR_BRAND     = $TOPBAR_BRAND     ?? 'RSUD Matraman';
+$TOPBAR_SUBTITLE  = $TOPBAR_SUBTITLE  ?? 'Portal';
+$TOPBAR_HOME_HREF = $TOPBAR_HOME_HREF ?? '/';
+$TOPBAR_LOGO_TEXT = $TOPBAR_LOGO_TEXT ?? 'RS';
+$TOPBAR_MAX_WIDTH = $TOPBAR_MAX_WIDTH ?? 'max-w-7xl';
+$TOPBAR_STICKY    = $TOPBAR_STICKY    ?? true;
+$TOPBAR_MENU      = $TOPBAR_MENU      ?? [];
 
-// Default Mega Menu khusus Portal
+// Default Mega Menu Portal
 $DEFAULT_MENU = [
-  'monitoring' => [
+  'layanan' => [
+    ['text' => 'Jadwal Dokter',      'href' => '/pages/jadwal'],
+    ['text' => 'Poliklinik',         'href' => '/pages/poliklinik'],
     ['text' => 'Ketersediaan Kamar', 'href' => '/pages/rooms'],
-    ['text' => 'Bed Management',     'href' => '/pages/rooms?tab=bed'],
-    ['text' => 'IGD 24 Jam',         'href' => '/igd'],
-  ],
-  'operasional' => [
-    ['text' => 'Jadwal Dokter',      'href' => '/#jadwal'],
-    ['text' => 'Poliklinik',         'href' => '/poliklinik'],
-    ['text' => 'Penunjang (Lab/RIS)','href' => '/penunjang'],
+    ['text' => 'Penunjang (Lab/RIS)','href' => '/pages/penunjang'],
     ['text' => 'Antrian Ralan',      'href' => '/pages/antrian'],
   ],
   'konten' => [
-    ['text' => 'Berita & Artikel',   'href' => '/berita'],
-    ['text' => 'Pengumuman',         'href' => '/pengumuman'],
-    ['text' => 'FAQ',                'href' => '/faq'],
+    ['text' => 'Berita & Artikel', 'href' => '/pages/berita'],
+    ['text' => 'Pengumuman',       'href' => '/pages/pengumuman'],
+    ['text' => 'FAQ',              'href' => '/pages/faq'],
   ],
   'administrasi' => [
-    ['text' => 'Tarif Layanan',      'href' => '/tarif'],
-    ['text' => 'Informasi Pasien',   'href' => '/informasi'],
-    ['text' => 'Hak & Kewajiban',    'href' => '/hak-kewajiban'],
+    ['text' => 'Tarif Layanan',    'href' => '/pages/tarif'],
+    ['text' => 'Informasi Pasien', 'href' => '/pages/informasi'],
+    ['text' => 'Hak & Kewajiban',  'href' => '/pages/hak-kewajiban'],
   ],
 ];
 $MENU = array_replace_recursive($DEFAULT_MENU, $TOPBAR_MENU);
@@ -45,17 +39,17 @@ $MENU = array_replace_recursive($DEFAULT_MENU, $TOPBAR_MENU);
 $here = $_SERVER['REQUEST_URI'] ?? '/';
 $next = ($here && str_starts_with($here, '/')) ? $here : '/pages/portal';
 
-$name  = trim((string)($u['name']  ?? 'Pengguna'));
-$email = trim((string)($u['email'] ?? ''));
+$name   = trim((string)($u['name']  ?? 'Pengguna'));
+$email  = trim((string)($u['email'] ?? ''));
 $avatar = trim((string)($u['avatar'] ?? ''));
 if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
   $hash   = $email !== '' ? md5(strtolower($email)) : md5($name ?: 'user');
-  $avatar = 'https://www.gravatar.com/avatar/' . $hash . '?s=160&d=identicon';
+  $avatar = 'https://www.gravatar.com/avatar/'.$hash.'?s=160&d=identicon';
 }
 
 $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
 ?>
-<header class="<?= $hdrSticky ?> z-40 border-b border-gray-200/60 bg-white/80 backdrop-blur dark:border-gray-800/60 dark:bg-gray-900/70"
+<header class="<?= $hdrSticky ?> z-50 border-b border-gray-200/60 bg-white dark:border-gray-800/60 dark:bg-gray-900"
         x-data="portalTopbarLite(<?= htmlspecialchars(json_encode($MENU, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)">
   <div class="mx-auto flex h-14 <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> items-center justify-between px-4">
     <!-- Brand -->
@@ -69,12 +63,11 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
       </span>
     </a>
 
-    <!-- NAV desktop: tombol kategori sebagai trigger mega menu -->
+    <!-- NAV desktop -->
     <nav class="hidden md:flex items-center gap-4 text-sm">
-      <button @click="toggle('monitoring')"  :class="isOpen('monitoring') && 'text-primary'" class="hover:opacity-80">Monitoring</button>
-      <button @click="toggle('operasional')" :class="isOpen('operasional') && 'text-primary'" class="hover:opacity-80">Operasional</button>
-      <button @click="toggle('konten')"      :class="isOpen('konten') && 'text-primary'" class="hover:opacity-80">Konten</button>
-      <button @click="toggle('administrasi')" :class="isOpen('administrasi') && 'text-primary'" class="hover:opacity-80">Administrasi</button>
+      <button @click="toggle('layanan')"      @mouseenter="hover('layanan')"      :class="isOpen('layanan') && 'text-primary'"      class="hover:opacity-80">Layanan</button>
+      <button @click="toggle('konten')"       @mouseenter="hover('konten')"       :class="isOpen('konten') && 'text-primary'"       class="hover:opacity-80">Konten</button>
+      <button @click="toggle('administrasi')" @mouseenter="hover('administrasi')" :class="isOpen('administrasi') && 'text-primary'" class="hover:opacity-80">Administrasi</button>
     </nav>
 
     <div class="flex items-center gap-2">
@@ -114,12 +107,13 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
     </div>
   </div>
 
-  <!-- Backdrop -->
-  <div x-show="open" x-transition.opacity class="fixed inset-0 z-30 bg-black/60" @click="close()"></div>
+  <!-- Backdrop: desktop & mobile dipisah -->
+  <div x-show="open && !isMobile" x-transition.opacity class="fixed inset-x-0 bottom-0 top-14 z-40 bg-black/40" @click="close()"></div>
+  <div x-show="open && isMobile"  x-transition.opacity class="fixed inset-0 z-40 bg-black/60" @click="close()"></div>
 
-  <!-- Desktop Mega Menu -->
+  <!-- Desktop Mega -->
   <div x-show="open && !isMobile" x-transition
-       class="fixed inset-x-0 top-14 z-40 mx-auto w-full <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> px-4"
+       class="fixed inset-x-0 top-14 z-50 mx-auto w-full <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> px-4"
        @keydown.escape.window="close()" @click.outside="close()">
     <div class="rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-gray-900">
       <div class="flex items-center justify-between px-6 py-4">
@@ -138,7 +132,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
   </div>
 
   <!-- Mobile Fullscreen -->
-  <div x-show="open && isMobile" x-transition class="fixed inset-0 z-40 grid place-items-start bg-white dark:bg-gray-900" @keydown.escape.window="close()">
+  <div x-show="open && isMobile" x-transition class="fixed inset-0 z-50 grid place-items-start bg-white dark:bg-gray-900" @keydown.escape.window="close()">
     <div class="w-full">
       <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
         <div class="flex items-center gap-2"><button @click="goBack()" x-show="history.length>0" class="text-sm">← Kembali</button><p class="font-semibold" x-text="activeTitle()"></p></div>
@@ -146,8 +140,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
       </div>
       <div class="p-2">
         <div x-show="level===0" class="rounded-xl bg-gray-50 p-2 shadow-sm dark:bg-gray-800/40">
-          <button class="flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('monitoring')"><span class="font-medium">Monitoring</span><span>›</span></button>
-          <button class="mt-2 flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('operasional')"><span class="font-medium">Operasional</span><span>›</span></button>
+          <button class="flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('layanan')"><span class="font-medium">Layanan</span><span>›</span></button>
           <button class="mt-2 flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('konten')"><span class="font-medium">Konten</span><span>›</span></button>
           <button class="mt-2 flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('administrasi')"><span class="font-medium">Administrasi</span><span>›</span></button>
         </div>
@@ -164,14 +157,15 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
 <script>
   function portalTopbarLite(items){
     return {
-      open:false, active:'monitoring', level:0, history:[], items,
+      open:false, active:'layanan', level:0, history:[], items,
       get isMobile(){ return window.matchMedia('(max-width: 767px)').matches; },
-      activeTitle(){ const map={monitoring:'Monitoring', operasional:'Operasional', konten:'Konten', administrasi:'Administrasi'}; return map[this.active] || 'Menu'; },
+      activeTitle(){ const map={layanan:'Layanan', konten:'Konten', administrasi:'Administrasi'}; return map[this.active] || 'Menu'; },
       isOpen(k){ return this.open && this.active===k; },
-      openFirst(){ this.active='monitoring'; this.open=true; this.level=0; },
+      openFirst(){ this.active='layanan'; this.open=true; this.level=0; },
       toggle(k){ if(this.open && this.active===k){ this.close(); return; } this.active=k; this.open=true; this.level=0; },
+      hover(k){ if(!this.isMobile){ this.active=k; this.open=true; this.level=0; } },
       openSection(k){ this.history.push(this.active); this.active=k; this.level=1; },
-      goBack(){ if(this.level===1){ this.level=0; this.active=this.history.pop()||'monitoring'; } else { this.close(); } },
+      goBack(){ if(this.level===1){ this.level=0; this.active=this.history.pop()||'layanan'; } else { this.close(); } },
       close(){ this.open=false; this.level=0; this.history=[]; },
       toggleTheme(){ const r=document.documentElement; const dark=!r.classList.contains('dark'); r.classList.toggle('dark',dark); localStorage.setItem('theme',dark?'dark':'light'); }
     }

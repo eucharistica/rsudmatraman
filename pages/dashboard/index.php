@@ -33,9 +33,6 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
   <meta name="theme-color" content="#38bdf8" />
 
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script>
-    tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#38bdf8'},boxShadow:{soft:'0 10px 30px -10px rgba(0,0,0,.25)'}}}}
-  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
@@ -96,13 +93,13 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
       <div class="mt-4">
         <button class="rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                 @click="api.loading=true; fetch('/api-website/ping.php?db=1',{headers:{'Accept':'application/json'}})
-  .then(r=>r.text())
-  .then(t=>{
-    let j; try { j = JSON.parse(t); } catch(_){ throw new Error('Ping bukan JSON: '+t.slice(0,200)); }
-    api.loading=false; api.ok=!!j.ok; api.counts=j.db?.counts||{};
-    api.error = j.ok ? null : (j.error + (j.message?(' — '+j.message):''));
-  })
-  .catch(e=>{ api.loading=false; api.ok=false; api.error = e.message; });">
+                .then(r=>r.text())
+                .then(t=>{
+                  let j; try { j = JSON.parse(t); } catch(_){ throw new Error('Ping bukan JSON: '+t.slice(0,200)); }
+                  api.loading=false; api.ok=!!j.ok; api.counts=j.db?.counts||{};
+                  api.error = j.ok ? null : (j.error + (j.message?(' — '+j.message):''));
+                })
+                .catch(e=>{ api.loading=false; api.ok=false; api.error = e.message; });">
           Cek Ulang
         </button>
       </div>
@@ -113,9 +110,7 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
       include __DIR__ . '/../../partials/dashboard-activity.php';
     }
     ?>
-
   </main>
-
-  <?php include dirname(__DIR__, 3) . '/partials/footer-app.php'; ?>
+  <?php include dirname(__DIR__, 2) . '/partials/footer-app.php'; ?>
 </body>
 </html>

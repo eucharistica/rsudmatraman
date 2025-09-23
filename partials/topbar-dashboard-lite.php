@@ -1,21 +1,19 @@
 <?php
 declare(strict_types=1);
-
-// Varian TOPBAR untuk Dashboard (LITE).
 require_once __DIR__ . '/../lib/auth.php';
 
 $u    = auth_current_user();
 $role = auth_role();
 
-$TOPBAR_BRAND      = $TOPBAR_BRAND      ?? 'RSUD Matraman';
-$TOPBAR_SUBTITLE   = $TOPBAR_SUBTITLE   ?? 'Dashboard Admin';
-$TOPBAR_HOME_HREF  = $TOPBAR_HOME_HREF  ?? '/';
-$TOPBAR_LOGO_TEXT  = $TOPBAR_LOGO_TEXT  ?? 'RS';
-$TOPBAR_MAX_WIDTH  = $TOPBAR_MAX_WIDTH  ?? 'max-w-7xl';
-$TOPBAR_STICKY     = $TOPBAR_STICKY     ?? true;
-$TOPBAR_MENU       = $TOPBAR_MENU       ?? [];
+$TOPBAR_BRAND     = $TOPBAR_BRAND     ?? 'RSUD Matraman';
+$TOPBAR_SUBTITLE  = $TOPBAR_SUBTITLE  ?? 'Dashboard Admin';
+$TOPBAR_HOME_HREF = $TOPBAR_HOME_HREF ?? '/';
+$TOPBAR_LOGO_TEXT = $TOPBAR_LOGO_TEXT ?? 'RS';
+$TOPBAR_MAX_WIDTH = $TOPBAR_MAX_WIDTH ?? 'max-w-7xl';
+$TOPBAR_STICKY    = $TOPBAR_STICKY    ?? true;
+$TOPBAR_MENU      = $TOPBAR_MENU      ?? [];
 
-// Default Mega Menu khusus Dashboard
+// Default Mega Menu Dashboard
 $DEFAULT_MENU = [
   'cms' => [
     ['text' => 'Berita & Artikel', 'href' => '/pages/cms/berita'],
@@ -24,10 +22,10 @@ $DEFAULT_MENU = [
     ['text' => 'Media/Assets',     'href' => '/pages/cms/media'],
   ],
   'master' => [
-    ['text' => 'Poliklinik',   'href' => '/pages/master/poliklinik'],
-    ['text' => 'Dokter',       'href' => '/pages/master/dokter'],
-    ['text' => 'Jadwal',       'href' => '/pages/master/jadwal'],
-    ['text' => 'Tarif',        'href' => '/pages/master/tarif'],
+    ['text' => 'Poliklinik', 'href' => '/pages/master/poliklinik'],
+    ['text' => 'Dokter',     'href' => '/pages/master/dokter'],
+    ['text' => 'Jadwal',     'href' => '/pages/master/jadwal'],
+    ['text' => 'Tarif',      'href' => '/pages/master/tarif'],
   ],
   'operasional' => [
     ['text' => 'Ketersediaan Kamar', 'href' => '/pages/rooms'],
@@ -46,17 +44,17 @@ $MENU = array_replace_recursive($DEFAULT_MENU, $TOPBAR_MENU);
 $here = $_SERVER['REQUEST_URI'] ?? '/';
 $next = ($here && str_starts_with($here, '/')) ? $here : '/pages/dashboard';
 
-$name  = trim((string)($u['name']  ?? 'Pengguna'));
-$email = trim((string)($u['email'] ?? ''));
+$name   = trim((string)($u['name']  ?? 'Pengguna'));
+$email  = trim((string)($u['email'] ?? ''));
 $avatar = trim((string)($u['avatar'] ?? ''));
 if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
   $hash   = $email !== '' ? md5(strtolower($email)) : md5($name ?: 'user');
-  $avatar = 'https://www.gravatar.com/avatar/' . $hash . '?s=160&d=identicon';
+  $avatar = 'https://www.gravatar.com/avatar/'.$hash.'?s=160&d=identicon';
 }
 
 $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
 ?>
-<header class="<?= $hdrSticky ?> z-40 border-b border-gray-200/60 bg-white/80 backdrop-blur dark:border-gray-800/60 dark:bg-gray-900/70"
+<header class="<?= $hdrSticky ?> z-50 border-b border-gray-200/60 bg-white dark:border-gray-800/60 dark:bg-gray-900"
         x-data="dashTopbarLite(<?= htmlspecialchars(json_encode($MENU, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>)">
   <div class="mx-auto flex h-14 <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> items-center justify-between px-4">
     <!-- Brand -->
@@ -68,12 +66,12 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
       </span>
     </a>
 
-    <!-- NAV desktop: tombol kategori -->
+    <!-- NAV desktop -->
     <nav class="hidden md:flex items-center gap-4 text-sm">
-      <button @click="toggle('cms')"        :class="isOpen('cms') && 'text-primary'" class="hover:opacity-80">CMS</button>
-      <button @click="toggle('master')"     :class="isOpen('master') && 'text-primary'" class="hover:opacity-80">Data Master</button>
-      <button @click="toggle('operasional')" :class="isOpen('operasional') && 'text-primary'" class="hover:opacity-80">Operasional</button>
-      <button @click="toggle('sistem')"     :class="isOpen('sistem') && 'text-primary'" class="hover:opacity-80">Sistem</button>
+      <button @click="toggle('cms')"         @mouseenter="hover('cms')"         :class="isOpen('cms') && 'text-primary'"         class="hover:opacity-80">CMS</button>
+      <button @click="toggle('master')"      @mouseenter="hover('master')"      :class="isOpen('master') && 'text-primary'"      class="hover:opacity-80">Data Master</button>
+      <button @click="toggle('operasional')" @mouseenter="hover('operasional')" :class="isOpen('operasional') && 'text-primary'" class="hover:opacity-80">Operasional</button>
+      <button @click="toggle('sistem')"      @mouseenter="hover('sistem')"      :class="isOpen('sistem') && 'text-primary'"      class="hover:opacity-80">Sistem</button>
     </nav>
 
     <div class="flex items-center gap-2">
@@ -108,11 +106,14 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
     </div>
   </div>
 
-  <!-- Backdrop -->
-  <div x-show="open" x-transition.opacity class="fixed inset-0 z-30 bg-black/60" @click="close()"></div>
+  <!-- Backdrop: desktop & mobile dipisah -->
+  <div x-show="open && !isMobile" x-transition.opacity class="fixed inset-x-0 bottom-0 top-14 z-40 bg-black/40" @click="close()"></div>
+  <div x-show="open && isMobile"  x-transition.opacity class="fixed inset-0 z-40 bg-black/60" @click="close()"></div>
 
   <!-- Desktop Mega -->
-  <div x-show="open && !isMobile" x-transition class="fixed inset-x-0 top-14 z-40 mx-auto w-full <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> px-4" @keydown.escape.window="close()" @click.outside="close()">
+  <div x-show="open && !isMobile" x-transition
+       class="fixed inset-x-0 top-14 z-50 mx-auto w-full <?= htmlspecialchars($TOPBAR_MAX_WIDTH, ENT_QUOTES) ?> px-4"
+       @keydown.escape.window="close()" @click.outside="close()">
     <div class="rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-gray-900">
       <div class="flex items-center justify-between px-6 py-4">
         <h3 class="text-lg font-semibold" x-text="activeTitle()"></h3>
@@ -130,7 +131,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
   </div>
 
   <!-- Mobile Fullscreen -->
-  <div x-show="open && isMobile" x-transition class="fixed inset-0 z-40 grid place-items-start bg-white dark:bg-gray-900" @keydown.escape.window="close()">
+  <div x-show="open && isMobile" x-transition class="fixed inset-0 z-50 grid place-items-start bg-white dark:bg-gray-900" @keydown.escape.window="close()">
     <div class="w-full">
       <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
         <div class="flex items-center gap-2"><button @click="goBack()" x-show="history.length>0" class="text-sm">← Kembali</button><p class="font-semibold" x-text="activeTitle()"></p></div>
@@ -162,6 +163,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
       isOpen(k){ return this.open && this.active===k; },
       openFirst(){ this.active='cms'; this.open=true; this.level=0; },
       toggle(k){ if(this.open && this.active===k){ this.close(); return; } this.active=k; this.open=true; this.level=0; },
+      hover(k){ if(!this.isMobile){ this.active=k; this.open=true; this.level=0; } },
       openSection(k){ this.history.push(this.active); this.active=k; this.level=1; },
       goBack(){ if(this.level===1){ this.level=0; this.active=this.history.pop()||'cms'; } else { this.close(); } },
       close(){ this.open=false; this.level=0; this.history=[]; },

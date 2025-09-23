@@ -10,6 +10,7 @@ module.exports = {
       "./api-website/**/*.php",
       "./assets/**/*.php",
       "./lib/**/*.php",
+      './assets/js/**/*.js',
     ],
     theme: {
       extend: {

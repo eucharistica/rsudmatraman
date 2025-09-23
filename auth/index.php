@@ -69,17 +69,6 @@ $errors = [
 
   <!-- Tailwind & Alpine -->
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: { primary: { DEFAULT: '#38bdf8' } },
-          boxShadow: { soft: '0 10px 30px -10px rgba(0,0,0,.25)' }
-        }
-      }
-    }
-  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
   <?php if ($SITE_KEY): ?>
