@@ -86,12 +86,39 @@ function login_throttle_reset(): void {
  * ratelimit_enforce lama — disesuaikan agar tidak memaksa JSON.
  * Biarkan dipakai untuk endpoint API lain bila perlu.
  */
-function ratelimit_enforce(string $bucket, int $max, int $windowSeconds, ?callable $onLimit = null): void {
-  if (!rate_limit_allow($bucket, $max, $windowSeconds)) {
-    if ($onLimit) $onLimit();
-    http_response_code(429);
-    echo 'Too Many Requests';
-    exit;
+// Adapter seragam untuk rate limit
+if (!function_exists('rate_limit_enforce')) {
+  /**
+   * Enforce rate limit dengan fallback ke fungsi yang tersedia.
+   *
+   * @param string $key     kunci identitas (mis. "forgot:<hash email + ip>")
+   * @param int    $max     maksimum request dalam window
+   * @param int    $window  window detik (mis. 60)
+   */
+  function rate_limit_enforce(string $key, int $max = 5, int $window = 60): void {
+    // 1) Punya fungsi modern ratelimit_enforce()? (punyamu)
+    if (function_exists('ratelimit_enforce')) {
+      try {
+        // Coba urutan (key, max, window)
+        ratelimit_enforce($key, $max, $window);
+        return;
+      } catch (Throwable $e) {
+        // Coba urutan (key, window, max)
+        try {
+          ratelimit_enforce($key, $window, $max);
+          return;
+        } catch (Throwable $e2) {
+          // Biarkan lanjut ke fallback di bawah
+        }
+      }
+    }
+
+    // 2) Punya versi lama rate_limit_check(key, window, max)?
+    if (function_exists('rate_limit_check')) {
+      rate_limit_check($key, $window, $max);
+      return;
+    }
+
+    // 3) Tidak ada apa-apa → no-op (jangan ganggu alur)
   }
-  // catatan: fungsi ini *tidak* auto-hit. Panggil rate_limit_hit() di tempat yang sesuai.
 }

@@ -159,7 +159,7 @@ $csrf = $_SESSION['csrf'];
             this.form = Object.assign({'smtp.enabled': false}, j.data || {});
             this.form['smtp.enabled'] = (this.form['smtp.enabled']==='1' || this.form['smtp.enabled']===1 || this.form['smtp.enabled']===true);
           }catch(e){
-            vtoast.error(e.message || 'Gagal memuat');
+            notify.error(e.message || 'Gagal memuat');
           }
         },
 
@@ -200,9 +200,9 @@ $csrf = $_SESSION['csrf'];
             let j; try { j = JSON.parse(text); } catch { throw new Error('Respon bukan JSON: ' + text.slice(0, 200)); }
             if (!j.ok) throw new Error(j.message || j.error || 'Gagal mengirim email tes');
 
-            vtoast.success('Email tes terkirim ke ' + to);
+            notify.success('Email tes terkirim ke ' + to);
           } catch(e){
-            vtoast.error(e.message || 'Gagal kirim email tes');
+            notify.error(e.message || 'Gagal kirim email tes');
           } finally {
             this.testing = false;
           }

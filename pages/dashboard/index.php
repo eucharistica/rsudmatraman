@@ -1,23 +1,31 @@
 <?php
 declare(strict_types=1);
 
+// /pages/dashboard/index.php
 require_once __DIR__ . '/../../lib/app.php';
 app_boot();
-$db = db();
 
-$u     = auth_current_user();
+$u = auth_current_user();
+if (!$u) {
+  header('Location: /login/?next=' . rawurlencode('/pages/dashboard'));
+  exit;
+}
+
 $name  = trim((string)($u['name']  ?? 'Pengguna'));
 $email = trim((string)($u['email'] ?? ''));
-$role  = strtolower((string)($u['role']  ?? 'user'));
+$role  = strtolower(trim((string)($u['role']  ?? 'user')));
+
+$TOPBAR_SUBTITLE = 'Dashboard';
+$db = db();
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth"
-      x-data="{theme:localStorage.getItem('theme')|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),
+      x-data="{theme:localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),
                api:{loading:true,ok:false,counts:{},error:null}}"
       x-init="$watch('theme',t=>localStorage.setItem('theme',t));
               (async()=>{
                 try{
-                  const r=await fetch('/api-website/ping?db=1',{headers:{'Accept':'application/json'}});
+                  const r=await fetch('/api-website/ping.php?db=1',{headers:{'Accept':'application/json'}});
                   const j=await r.json();
                   api.loading=false; api.ok=!!j.ok; api.counts=j.db?.counts||{};
                   if(!j.ok) api.error=j.error||'Gagal mengecek API';
@@ -31,17 +39,13 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
   <link rel="shortcut icon" href="/assets/img/favicon.ico" type="image/x-icon">
   <title>Dashboard — RSUD Matraman</title>
   <meta name="theme-color" content="#38bdf8" />
-
-  <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
+  <link rel="stylesheet" href="/assets/components/css/tw.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
-  <style>*{-webkit-tap-highlight-color:transparent}</style>
+  <style>*{ -webkit-tap-highlight-color:transparent }</style>
 </head>
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
 
-  <?php
-    $TOPBAR_SUBTITLE = 'Dashboard';
-    include __DIR__ . '/../../partials/topbar-dashboard-lite.php';
-  ?>
+  <?php include __DIR__ . '/../../partials/topbar-dashboard-lite.php'; ?>
 
   <main class="mx-auto max-w-7xl px-4 py-8">
     <header>
@@ -97,20 +101,21 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
                 .then(t=>{
                   let j; try { j = JSON.parse(t); } catch(_){ throw new Error('Ping bukan JSON: '+t.slice(0,200)); }
                   api.loading=false; api.ok=!!j.ok; api.counts=j.db?.counts||{};
-                  api.error = j.ok ? null : (j.error + (j.message?(' — '+j.message):''));
-                })
+                  api.error = j.ok ? null : (j.error + (j.message?(' — '+j.message):'')); })
                 .catch(e=>{ api.loading=false; api.ok=false; api.error = e.message; });">
           Cek Ulang
         </button>
       </div>
     </section>
 
-    <?php 
-    if (rbac_user_has_role($db, (int)($_SESSION['user']['id'] ?? 0), 'admin')) {
+    <?php
+    // contoh menampilkan activity hanya untuk admin
+    if (rbac_user_has_role($db, (int)($u['id'] ?? 0), 'admin')) {
       include __DIR__ . '/../../partials/dashboard-activity.php';
     }
     ?>
   </main>
+
   <?php include dirname(__DIR__, 2) . '/partials/footer-app.php'; ?>
 </body>
 </html>

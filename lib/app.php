@@ -22,6 +22,7 @@ require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/rbac.php';
 require_once __DIR__ . '/rate_limit.php';
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/mailer.php';
 
 // -----------------------------------------------------------------------------
 // Konfigurasi lingkungan sederhana
@@ -75,52 +76,58 @@ function app_boot(array $opts = []): void {
 // Security Headers (CSP disesuaikan: Alpine CDN, reCAPTCHA, Gravatar)
 // -----------------------------------------------------------------------------
 function send_security_headers(): void {
-    static $sent = false; if ($sent || headers_sent()) return; $sent = true;
-  
-    header('X-Content-Type-Options: nosniff');
-    header('X-Frame-Options: SAMEORIGIN');
-    header('Referrer-Policy: strict-origin-when-cross-origin');
-    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
-    header('Cross-Origin-Opener-Policy: same-origin');
-    header('Cross-Origin-Resource-Policy: same-site');
-    header('X-XSS-Protection: 0');
-  
-    // Host sendiri (dipakai untuk self connect di beberapa server)
-    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-    $self = $host !== '' ? "https://{$host}" : "'self'";
-  
-    // NOTE:
-    // - 'unsafe-inline' di script-src sementara diperlukan karena kamu masih pakai inline <script>.
-    //   Nanti jika JS dipindah ke file eksternal atau diberi nonce, hapus 'unsafe-inline'.
-    // - Tambahkan domain API eksternal (rsudmatraman.jakarta.go.id) ke connect-src.
-    // - Tambahkan domain Google Maps ke frame-src.
-    $csp = [
-      "default-src 'self'",
-      // Alpine CDN + inline script sementara
-      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://static.cloudflareinsights.com",
-      // Tailwind CSS lokal + inline style (class utilities, style attr)
-      "style-src 'self' 'unsafe-inline'",
-      // Gambar dari mana saja yang aman (https) + data: (SVG inline/gravatar)
-      "img-src 'self' https: data: https://www.gravatar.com",
-      // Font lokal/https/data
-      "font-src 'self' https: data:",
-      // AJAX/fetch ke diri sendiri + API eksternal + recaptcha
-      "connect-src 'self' {$self} https://website.rsudmatraman.my.id https://rsudmatraman.my.id https://rsudmatraman.jakarta.go.id https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cloudflareinsights.com https://static.cloudflareinsights.com",
-      // Izinkan Google Maps iframe
-      "frame-src 'self' https://www.google.com/ https://www.google.com/recaptcha/ https://recaptcha.google.com/",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "object-src 'none'",
-      "frame-ancestors 'self'",
-    ];
-  
-    header('Content-Security-Policy: '.implode('; ', $csp));
-  
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '80') === '443');
-    if ($https) {
-      header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
-    }
+  static $sent = false; if ($sent || headers_sent()) return; $sent = true;
+
+  header('X-Content-Type-Options: nosniff');
+  header('X-Frame-Options: SAMEORIGIN');
+  header('Referrer-Policy: strict-origin-when-cross-origin');
+  header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+  header('Cross-Origin-Opener-Policy: same-origin');
+  header('Cross-Origin-Resource-Policy: same-site');
+  header('X-XSS-Protection: 0');
+
+  // Origin saat ini
+  $host   = (string)($_SERVER['HTTP_HOST'] ?? '');
+  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+  $origin = ($host !== '') ? "{$scheme}://{$host}" : '';
+
+  // Daftar origin internal yang diizinkan (HANYA HTTPS)
+  // Tambahkan host lain yang Anda pakai (mis. apex domain) agar tidak bentrok saat form submit.
+  $allowedOrigins = array_values(array_unique(array_filter([
+    $origin,
+    'https://website.rsudmatraman.my.id',
+    'https://rsudmatraman.my.id',
+  ])));
+
+  // Build string origins untuk CSP
+  $formAction = "'self' " . implode(' ', $allowedOrigins);
+
+  $csp = [
+    "default-src 'self'",
+    // Alpine CDN + inline script (sementara)
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://static.cloudflareinsights.com",
+    // Tailwind lokal + inline style
+    "style-src 'self' 'unsafe-inline'",
+    // Gravatar + semua https (gambar) + data:
+    "img-src 'self' https: data: https://www.gravatar.com",
+    "font-src 'self' https: data:",
+    // XHR/fetch (self + beberapa origin internal + recaptcha)
+    "connect-src 'self' {$origin} https://website.rsudmatraman.my.id https://rsudmatraman.my.id https://rsudmatraman.jakarta.go.id https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://cloudflareinsights.com https://static.cloudflareinsights.com",
+    // iframe (Google/recaptcha)
+    "frame-src 'self' https://www.google.com/ https://www.google.com/recaptcha/ https://recaptcha.google.com/",
+    "base-uri 'self'",
+    // ⬇️ inilah kuncinya
+    "form-action {$formAction}",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+  ];
+
+  header('Content-Security-Policy: '.implode('; ', $csp));
+
+  if ($scheme === 'https') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
   }
+}
   
 
 // -----------------------------------------------------------------------------

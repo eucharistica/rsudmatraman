@@ -5,31 +5,21 @@ require_once __DIR__ . '/../lib/app.php';
 app_boot();
 
 // --- helper ---
-function is_safe_next(string $n): bool {
-  if ($n === '' || $n[0] !== '/') return false;
-  if (str_contains($n, "\r") || str_contains($n, "\n")) return false;
-  if (str_starts_with($n, '//')) return false;
-  if (preg_match('/^[a-z][a-z0-9+\-.]*:/i', $n)) return false;
-  return true;
-}
-
-$CFG_FILE = __DIR__ . '/../_private/website.php';
-$CFG = is_file($CFG_FILE) ? require $CFG_FILE : [];
-$SITE_KEY = $CFG['RECAPTCHA_SITE_KEY'] ?? '';
+$CFG_FILE  = __DIR__ . '/../_private/website.php';
+$CFG       = is_file($CFG_FILE) ? require $CFG_FILE : [];
+$SITE_KEY  = $CFG['RECAPTCHA_SITE_KEY'] ?? '';
 
 $next = '/pages/portal';
-if (isset($_GET['next']) && is_safe_next((string)$_GET['next'])) {
+if (isset($_GET['next']) && auth_is_safe_next((string)$_GET['next'])) {
   $next = (string)$_GET['next'];
 }
 
 // Sudah login? arahkan
 if (auth_is_logged_in()) {
-  $role = auth_role();
-  if ($next && $next !== '/login' && $next !== '/auth/') {
-    header('Location: '.$next, true, 302); exit;
-  }
-  $dest = in_array($role, ['admin','editor'], true) ? '/pages/dashboard' : '/pages/portal';
-  header('Location: '.$dest, true, 302); exit;
+  $u = auth_current_user();
+  $dest = auth_default_destination($u, $_GET['next'] ?? null);
+  header('Location: '.$dest, true, 302);
+  exit;
 }
 
 // CSRF
@@ -48,11 +38,13 @@ $errors = [
   'google_denied'  => 'Login Google dibatalkan. Silakan pilih akun dan izinkan akses untuk melanjutkan.',
 ];
 
-// Data user untuk header (opsional)
-$u = auth_current_user(); $name = trim((string)($u['name']??'Pengguna')); $email = trim((string)($u['email']??''));
+// Optional header info
+$u     = auth_current_user();
+$name  = trim((string)($u['name']  ?? 'Pengguna'));
+$email = trim((string)($u['email'] ?? ''));
 $avatar = trim((string)($u['avatar'] ?? ''));
 if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
-  $hash   = $email !== '' ? md5(strtolower($email)) : md5($name ?: 'user');
+  $hash   = $email !== '' ? md5(strtolower(trim($email))) : md5($name ?: 'user');
   $avatar = 'https://www.gravatar.com/avatar/' . $hash . '?s=160&d=identicon';
 }
 ?>
@@ -68,20 +60,18 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
   <link rel="stylesheet" href="/assets/components/css/tw.css">
   <style>[x-cloak]{display:none!important} *{-webkit-tap-highlight-color:transparent}</style>
 
-  <!-- Alpine.js CSP build -->
   <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
 
-  <!-- Alpine component: auth card -->
   <script>
   document.addEventListener('alpine:init', function () {
     Alpine.data('authCard', function (initMode, csrf, next, useRecaptcha) {
       return {
         // ===== Tabs =====
         mode: (initMode === 'register' ? 'register' : 'login'),
-        switchTo: function(m){
+        switchTo(m){
           this.mode = (m==='register' ? 'register' : 'login');
           if (this.useRecaptcha) {
-            var self = this;
+            let self = this;
             this.$nextTick(function(){
               if (self.mode==='login') {
                 window.renderRecaptchaIfNeeded('recaptcha-login','login');
@@ -101,185 +91,160 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
         emailStatus:'',   // '', 'checking', 'ok', 'exists'
         years:[], months:[1,2,3,4,5,6,7,8,9,10,11,12], days:[],
 
-        init: function(){
+        init(){
           if (this.years.length === 0) {
-            var now = new Date(), Y = now.getFullYear(), i;
-            for (i=Y; i>=1900; i--) this.years.push(i);
+            const Y = new Date().getFullYear();
+            for (let i=Y; i>=1900; i--) this.years.push(i);
           }
           this.updateDays();
 
-          // Render recaptcha untuk tab awal
           if (this.useRecaptcha) {
-            var self = this;
-            this.$nextTick(function(){
-              if (self.mode==='login') {
+            const renderCurrent = () => {
+              if (this.mode==='login') {
                 window.renderRecaptchaIfNeeded('recaptcha-login','login');
               } else {
                 window.renderRecaptchaIfNeeded('recaptcha-register','register');
               }
-            });
+            };
+
+            // Jika sudah ready, render segera setelah Alpine apply x-show
+            if (window.__recaptcha && window.__recaptcha.ready) {
+              this.$nextTick(renderCurrent);
+            } else {
+              // Jika belum ready, tunggu event dari onRecaptchaReady()
+              window.addEventListener('recaptcha-ready', () => {
+                this.$nextTick(renderCurrent);
+              }, { once:true });
+            }
           }
         },
 
-        // ===== Helpers & Validations =====
-        updateDays: function(){
-          var m = parseInt(this.dob_m||0,10);
-          var y = parseInt(this.dob_y||0,10);
-          var dmax = 31;
-          if (m===4 || m===6 || m===9 || m===11) dmax = 30;
+        updateDays(){
+          const m = parseInt(this.dob_m||0,10);
+          const y = parseInt(this.dob_y||0,10);
+          let dmax = 31;
+          if ([4,6,9,11].includes(m)) dmax = 30;
           else if (m===2){
-            var leap = (y%4===0 && (y%100!==0 || y%400===0));
+            const leap = (y%4===0 && (y%100!==0 || y%400===0));
             dmax = leap ? 29 : 28;
           }
-          var dSel = parseInt(this.dob_d||0,10);
+          const dSel = parseInt(this.dob_d||0,10);
           this.days = [];
-          for (var d=1; d<=dmax; d++) this.days.push(d);
+          for (let d=1; d<=dmax; d++) this.days.push(d);
           if (dSel > dmax) this.dob_d = '';
         },
 
-        validName: function(){
-          var s = (this.name||'').trim();
+        validName(){
+          const s = (this.name||'').trim();
           if (s.length < 3) return false;
           if (/\d/.test(s)) return false;
           return /^[A-Za-zÀ-ÖØ-öø-ÿ'\.\-\s]+$/.test(s);
         },
-        validEmail: function(){
-          var e = (this.email||'').trim();
+        validEmail(){
+          const e = (this.email||'').trim();
           return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
         },
-        checkEmailAjax: function(){
+        checkEmailAjax(){
           if (!this.validEmail()) { this.emailStatus=''; return; }
           this.emailStatus = 'checking';
-          var self = this;
+          const self = this;
           fetch('/api-website/check_email.php?email=' + encodeURIComponent(this.email), { headers:{'Accept':'application/json'} })
-            .then(function(r){ return r.json(); })
-            .then(function(j){
-              self.emailStatus = (j && j.ok===true) ? (j.exists ? 'exists' : 'ok') : '';
-            })
-            .catch(function(){ self.emailStatus=''; });
+            .then(r=>r.json())
+            .then(j=>{ self.emailStatus = (j && j.ok===true) ? (j.exists ? 'exists' : 'ok') : ''; })
+            .catch(()=>{ self.emailStatus=''; });
         },
-        validPhone: function(){
-          var p = (this.phone||'').trim();
+        validPhone(){
+          const p = (this.phone||'').trim();
           return /^(\+62|62|0)8\d{8,11}$/.test(p);
         },
-        strongPw: function(){
-          var s = this.pw || '';
+        strongPw(){
+          const s = this.pw || '';
           return /[A-Z]/.test(s) && /[a-z]/.test(s) && /\d/.test(s) && s.length >= 8;
         },
-        pwMatch: function(){
-          return (this.pw||'') !== '' && this.pw === this.pw2;
-        },
-        dobValid: function(){
-          var d = parseInt(this.dob_d||0,10);
-          var m = parseInt(this.dob_m||0,10);
-          var y = parseInt(this.dob_y||0,10);
+        pwMatch(){ return (this.pw||'') !== '' && this.pw === this.pw2; },
+        dobValid(){
+          const d = parseInt(this.dob_d||0,10);
+          const m = parseInt(this.dob_m||0,10);
+          const y = parseInt(this.dob_y||0,10);
           if (!(d && m && y)) return false;
-          var dt = new Date(y, m-1, d);
+          const dt = new Date(y, m-1, d);
           return dt.getFullYear()===y && (dt.getMonth()+1)===m && dt.getDate()===d;
         },
-        disabledReg: function(){
-          if (!this.validName()) return true;
-          if (!this.validEmail()) return true;
-          if (this.emailStatus==='exists') return true;
-          if (!this.dobValid()) return true;
-          if (!this.validPhone()) return true;
-          if (!this.strongPw()) return true;
-          if (!this.pwMatch()) return true;
-          return false;
+        disabledReg(){
+          return !(this.validName() && this.validEmail() && this.emailStatus!=='exists'
+                   && this.dobValid() && this.validPhone() && this.strongPw() && this.pwMatch());
         },
 
         // ===== Submit Login: ambil token aktif & submit form =====
-        beforeSubmitLogin: function(formEl){
+        beforeSubmitLogin(formEl){
           if (!this.useRecaptcha) { formEl.submit(); return; }
-          var t = window.getActiveRecaptchaToken('login');
+          const t = window.getActiveRecaptchaToken('login');
           if (!t) { alert('Silakan centang reCAPTCHA.'); return; }
           formEl.querySelector('input[name=recaptcha_token]').value = t;
           formEl.submit();
         },
 
-        // ===== Submit Register: kirim AJAX ke /auth/register.php =====
-        submitRegister: function(){
+        // ===== Submit Register: NON-AJAX (hindari blokir CSP connect-src) =====
+        beforeSubmitRegister(formEl){
           if (this.disabledReg()) return;
-          var dob = this.dob_y + '-' + ('0'+this.dob_m).slice(-2) + '-' + ('0'+this.dob_d).slice(-2);
 
-          var token = '';
-          if (this.useRecaptcha) {
-            token = window.getActiveRecaptchaToken('register');
-            if (!token) { alert('Silakan centang reCAPTCHA.'); return; }
-          }
+          // jika ingin kirim sebagai satu field 'dob', aktifkan 2 baris ini dan sediakan <input type=hidden name=dob>:
+          // const dob = this.dob_y + '-' + ('0'+this.dob_m).slice(-2) + '-' + ('0'+this.dob_d).slice(-2);
+          // formEl.querySelector('input[name=dob]')?.setAttribute('value', dob);
 
-          var body = new URLSearchParams();
-          body.set('csrf', this.csrf);
-          body.set('next', this.next);
-          body.set('name', (this.name||'').trim());
-          body.set('email', (this.email||'').trim().toLowerCase());
-          body.set('dob', dob);
-          body.set('phone', (this.phone||'').trim());
-          body.set('password', this.pw||'');
-          body.set('password_confirm', this.pw2||'');
-          if (this.useRecaptcha) body.set('recaptcha_token', token);
-
-          fetch('/auth/register.php', {
-            method: 'POST',
-            headers: { 'Accept': 'text/plain, application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body
-          })
-          .then(function(r){
-            if (r.redirected) { window.location = r.url; return null; }
-            return r.text().then(function(t){
-              if (r.ok) { window.location.href = '/pages/portal'; return null; }
-              alert(t || 'Gagal mendaftar'); return null;
-            });
-          })
-          .catch(function(){ alert('Gagal mendaftar'); });
+          if (!this.useRecaptcha) { formEl.submit(); return; }
+          const t = window.getActiveRecaptchaToken('register');
+          if (!t) { alert('Silakan centang reCAPTCHA.'); return; }
+          formEl.querySelector('input[name=recaptcha_token]').value = t;
+          formEl.submit();
         }
       };
     });
   });
   </script>
 
-  <?php if ($SITE_KEY): ?>
-  <!-- reCAPTCHA v2 explicit render -->
-  <script>
-    window.__recaptcha = { loginId:null, regId:null, ready:false };
+<?php if ($SITE_KEY): ?>
+<script>
+  // Global state
+  window.__recaptcha = { loginId:null, regId:null, ready:false };
 
-    function onRecaptchaReady(){
-      window.__recaptcha.ready = true;
-      // Tidak merender di sini. Render saat tab aktif muncul (via Alpine).
-    }
+  // Dipanggil oleh Google API ketika siap
+  function onRecaptchaReady(){
+    window.__recaptcha.ready = true;
+    // Beritahu Alpine/JS lain bahwa reCAPTCHA sudah siap
+    window.dispatchEvent(new Event('recaptcha-ready'));
+  }
 
-    window.renderRecaptchaIfNeeded = function(containerId, type){
-      if (!window.__recaptcha.ready) return;
-      var el = document.getElementById(containerId);
-      if (!el) return;
+  // Render helper (aman dipanggil berulang)
+  window.renderRecaptchaIfNeeded = function(containerId, type){
+    if (!window.__recaptcha.ready) return;
+    var el = document.getElementById(containerId);
+    if (!el) return;
 
-      if (type === 'login') {
-        if (window.__recaptcha.loginId === null) {
-          window.__recaptcha.loginId = grecaptcha.render(containerId, { sitekey: '<?= htmlspecialchars($SITE_KEY, ENT_QUOTES) ?>' });
-        } else {
-          grecaptcha.reset(window.__recaptcha.loginId);
-        }
+    if (type === 'login') {
+      if (window.__recaptcha.loginId === null) {
+        window.__recaptcha.loginId = grecaptcha.render(containerId, { sitekey: '<?= htmlspecialchars($SITE_KEY, ENT_QUOTES) ?>' });
       } else {
-        if (window.__recaptcha.regId === null) {
-          window.__recaptcha.regId = grecaptcha.render(containerId, { sitekey: '<?= htmlspecialchars($SITE_KEY, ENT_QUOTES) ?>' });
-        } else {
-          grecaptcha.reset(window.__recaptcha.regId);
-        }
+        grecaptcha.reset(window.__recaptcha.loginId);
       }
-    };
+    } else {
+      if (window.__recaptcha.regId === null) {
+        window.__recaptcha.regId = grecaptcha.render(containerId, { sitekey: '<?= htmlspecialchars($SITE_KEY, ENT_QUOTES) ?>' });
+      } else {
+        grecaptcha.reset(window.__recaptcha.regId);
+      }
+    }
+  };
 
-    window.getActiveRecaptchaToken = function(type){
-      if (type === 'login' && window.__recaptcha.loginId !== null) {
-        return grecaptcha.getResponse(window.__recaptcha.loginId);
-      }
-      if (type === 'register' && window.__recaptcha.regId !== null) {
-        return grecaptcha.getResponse(window.__recaptcha.regId);
-      }
-      return '';
-    };
-  </script>
-  <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaReady&render=explicit&hl=id" async defer></script>
-  <?php endif; ?>
+  // Ambil token aktif
+  window.getActiveRecaptchaToken = function(type){
+    if (type === 'login' && window.__recaptcha.loginId !== null)   return grecaptcha.getResponse(window.__recaptcha.loginId);
+    if (type === 'register' && window.__recaptcha.regId !== null) return grecaptcha.getResponse(window.__recaptcha.regId);
+    return '';
+  };
+</script>
+<script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaReady&render=explicit&hl=id" async defer></script>
+<?php endif; ?>
 </head>
 
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
@@ -370,10 +335,25 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="h-4 w-4" alt="">
             Lanjutkan dengan Google
           </a>
+
+          <div class="mt-2 text-right">
+            <a href="/auth/forgot.php"
+              class="inline-block text-xs text-gray-500 underline hover:text-primary dark:text-gray-400">
+              Lupa password?
+            </a>
+          </div>
         </form>
 
-        <!-- ===== REGISTER ===== -->
-        <form x-show="mode==='register'" x-cloak @submit.prevent="submitRegister" class="space-y-3">
+        <!-- ===== REGISTER (NON-AJAX) ===== -->
+        <form x-show="mode==='register'" x-cloak method="POST" action="/auth/register.php"
+              @submit.prevent="beforeSubmitRegister($el)" class="space-y-3">
+          <input type="hidden" name="csrf" :value="csrf">
+          <input type="hidden" name="next" :value="next">
+          <input type="hidden" name="recaptcha_token" value="">
+          <!-- Jika ingin kirim single field tanggal:
+          <input type="hidden" name="dob" value="">
+          -->
+
           <a href="/auth/google.php?next=<?= urlencode($next) ?>"
             class="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800">
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="h-4 w-4" alt="">
@@ -381,8 +361,6 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
           </a>
 
           <div class="my-3 text-center text-xs text-gray-500 dark:text-gray-400">atau</div>
-          <input type="hidden" name="csrf" :value="csrf">
-          <input type="hidden" name="next" :value="next">
 
           <!-- Nama -->
           <label class="block">
@@ -416,15 +394,18 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
           <div>
             <span class="text-sm">Tanggal Lahir</span>
             <div class="mt-1 grid grid-cols-3 gap-2">
-              <select x-model.number="dob_d" class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+              <select x-model.number="dob_d" name="dob_d"
+                      class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
                 <option value="">Tanggal</option>
                 <template x-for="d in days" :key="'d-'+d"><option :value="d" x-text="d"></option></template>
               </select>
-              <select x-model.number="dob_m" @change="updateDays()" class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+              <select x-model.number="dob_m" name="dob_m" @change="updateDays()"
+                      class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
                 <option value="">Bulan</option>
                 <template x-for="m in months" :key="'m-'+m"><option :value="m" x-text="m"></option></template>
               </select>
-              <select x-model.number="dob_y" @change="updateDays()" class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+              <select x-model.number="dob_y" name="dob_y" @change="updateDays()"
+                      class="rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
                 <option value="">Tahun</option>
                 <template x-for="y in years" :key="'y-'+y"><option :value="y" x-text="y"></option></template>
               </select>

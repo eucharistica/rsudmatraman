@@ -2,56 +2,135 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../lib/app.php';
 app_boot();
-$db = db();
 
-if (!hash_equals($_SESSION['csrf'] ?? '', (string)($_POST['csrf'] ?? ''))) {
-  header('Location: /auth/forgot.php?e=csrf'); exit;
+//
+// CSRF
+//
+if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+  // Audit: CSRF gagal
+  audit_log('auth', 'forgot_csrf_fail', [
+    'message' => 'CSRF tidak valid pada forgot_post',
+  ]);
+  header('Location: /auth/forgot_done.php'); exit;
 }
 
 $email = strtolower(trim((string)($_POST['email'] ?? '')));
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-  header('Location: /auth/forgot.php?e=email'); exit;
+$ip    = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+$ua    = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+//
+// Audit: request diterima (tidak bocorkan status user)
+//
+audit_log('auth', 'forgot_request_received', [
+  'message' => 'Permintaan reset password diterima',
+  'meta'    => [
+    'email_hash' => hash('sha256', $email ?: '-'),
+    'ip'         => $ip,
+    'ua'         => substr($ua, 0, 255),
+  ],
+]);
+
+if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+  // Audit: email tidak valid (format)
+  audit_log('auth', 'forgot_invalid_email', [
+    'message' => 'Format email tidak valid',
+    'meta'    => [
+      'email_hash' => hash('sha256', $email ?: '-'),
+      'ip'         => $ip,
+    ],
+  ]);
+  header('Location: /auth/forgot_done.php'); exit;
 }
 
-// cari user aktif
-$st = $db->prepare("SELECT id, name, status FROM users WHERE email=:e LIMIT 1");
-$st->execute([':e'=>$email]);
-$u = $st->fetch();
-if (!$u || ($u['status'] ?? 'active') !== 'active') {
-  // jangan bocorkan status: selalu sukses
-  header('Location: /auth/forgot.php?sent=1'); exit;
-}
+$db = db();
 
-// buat token
-$token = bin2hex(random_bytes(32)); // 64 hex chars
-$hash  = hash('sha256', $token);
-$exp   = date('Y-m-d H:i:s', time()+3600); // 1 jam
-
-// simpan
-$ins = $db->prepare("INSERT INTO password_resets (user_id,email,token_hash,expires_at) VALUES (:u,:e,:h,:x)");
-$ins->execute([':u'=>$u['id'], ':e'=>$email, ':h'=>$hash, ':x'=>$exp]);
-
-// buat link reset absolut
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$link   = $scheme . '://' . $host . '/auth/reset.php?token=' . urlencode($token);
-
-// kirim email
-$sent = false; $err = null;
+//
+// Rate limit (opsional; aman jika adapter sudah dibuat)
+//
 try {
-  $html = '<p>Halo,</p><p>Silakan klik tautan berikut untuk mengatur ulang kata sandi:</p>'.
-          '<p><a href="'.$link.'">'.$link.'</a></p><p>Tautan berlaku 1 jam.</p>';
-  $sent = mailer_send($email, (string)($u['name'] ?? ''), 'Atur Ulang Kata Sandi', $html);
+  $key = 'forgot:' . hash('sha256', $email . '|' . $ip);
+  if (function_exists('rate_limit_enforce')) {
+    rate_limit_enforce($key, 5, 60); // max 5 req / 60s untuk kombinasi email+IP
+  }
 } catch (Throwable $e) {
-  $err = $e->getMessage();
-}
-
-if (function_exists('audit_log')) {
-  audit_log('auth', $sent ? 'forgot_mail_sent' : 'forgot_mail_error', [
-    'message' => $sent ? 'Kirim link reset' : 'Gagal kirim',
-    'meta'    => ['email'=>$email, 'error'=>$err]
+  // Audit: rate limit error (tidak memblok alur, hanya catat)
+  audit_log('auth', 'forgot_rate_limit_error', [
+    'message' => 'Rate limit error (diabaikan)',
+    'meta'    => ['err' => $e->getMessage()],
   ]);
 }
 
-// Selalu redirect ke halaman sukses (jangan bocor valid/invalid)
-header('Location: /auth/forgot.php?sent=1'); exit;
+try {
+  // Cari user
+  $st = $db->prepare("SELECT id, email, name, role FROM users WHERE email=:e and provider='password' LIMIT 1");
+  $st->execute([':e'=>$email]);
+  $u = $st->fetch(PDO::FETCH_ASSOC);
+
+  // Selalu arahkan ke halaman "cek email", apapun hasilnya
+  if ($u) {
+    $userId = (int)$u['id'];
+
+    // Buat selector + verifier
+    $selector = bin2hex(random_bytes(8));    // 16 chars
+    $verifier = bin2hex(random_bytes(32));   // 64 chars
+    $hash     = hash('sha256', $verifier);   // simpan hash, JANGAN simpan verifier
+    $expires  = (new DateTime('+30 minutes'))->format('Y-m-d H:i:s');
+
+    // Simpan token
+    $ins = $db->prepare("INSERT INTO password_resets (user_id, selector, verifier_hash, expires_at, used) VALUES (:uid,:sel,:vh,:exp,0)");
+    $ins->execute([':uid'=>$userId, ':sel'=>$selector, ':vh'=>$hash, ':exp'=>$expires]);
+
+    // Compose URL absolut
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $base = 'https://' . $host;
+    $link = $base . '/auth/reset.php?s=' . urlencode($selector) . '&t=' . urlencode($verifier);
+
+    // Kirim email (audit sukses/gagal)
+    $site = (string)config_get('site.name','Website');
+    $html = '<p>Anda meminta reset kata sandi untuk akun di <b>'.htmlspecialchars($site).'</b>.</p>'
+          . '<p>Klik tautan berikut untuk mengatur ulang kata sandi (berlaku 30 menit):</p>'
+          . '<p><a href="'.htmlspecialchars($link).'">'.htmlspecialchars($link).'</a></p>'
+          . '<p>Jika bukan Anda, abaikan email ini.</p>';
+
+    $sent = false; $sendErr = null;
+    try {
+      $sent = mailer_send($u['email'], (string)$u['name'], 'Reset Password — '.$site, $html);
+    } catch (Throwable $e) {
+      $sendErr = $e->getMessage();
+    }
+
+    audit_log('auth', $sent ? 'forgot_mail_sent' : 'forgot_mail_fail', [
+      'message' => $sent ? 'Email reset terkirim' : 'Gagal mengirim email reset',
+      'target_type' => 'user',
+      'target_id'   => (string)$userId,
+      'meta' => [
+        'email_hash' => hash('sha256', $u['email']),
+        'selector'   => $selector,  // aman, bukan verifier
+        'expires_at' => $expires,
+        'ip'         => $ip,
+        'ua'         => substr($ua, 0, 255),
+        'error'      => $sendErr,
+      ]
+    ]);
+  } else {
+    // User tidak ditemukan → tetap respon sama, tapi audit dicatat
+    audit_log('auth', 'forgot_user_not_found', [
+      'message' => 'Email tidak ditemukan (disamarkan)',
+      'meta'    => [
+        'email_hash' => hash('sha256', $email),
+        'ip'         => $ip,
+      ],
+    ]);
+  }
+} catch (Throwable $e) {
+  // Audit: error internal
+  audit_log('auth', 'forgot_internal_error', [
+    'message' => 'Kesalahan internal saat memproses forgot_post',
+    'meta'    => ['err' => $e->getMessage()],
+  ]);
+  // Tetap arahkan ke done untuk tidak bocorkan info
+  header('Location: /auth/forgot_done.php'); exit;
+}
+
+// Selesai: selalu tampilkan halaman “cek email”
+header('Location: /auth/forgot_done.php'); exit;

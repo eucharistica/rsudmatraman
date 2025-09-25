@@ -23,9 +23,9 @@ function is_indo_phone(string $p): bool {
 }
 function normalize_e164(string $p): string {
   $raw = preg_replace('/\D+/', '', $p);
-  if (str_starts_with($p, '+62')) return '+'.$raw;       // sudah +62...
-  if (str_starts_with($raw, '62')) return '+'.$raw;      // 62xxxxxxxx
-  if (str_starts_with($raw, '0'))  return '+62'.substr($raw, 1); // 0xxxxxxxx
+  if (str_starts_with($p, '+62')) return '+'.$raw;
+  if (str_starts_with($raw, '62')) return '+'.$raw;
+  if (str_starts_with($raw, '0'))  return '+62'.substr($raw, 1);
   return '+'.$raw;
 }
 function strong_pw(string $pw): bool {
@@ -65,17 +65,12 @@ $secret = (string)($CFG['RECAPTCHA_SECRET_KEY'] ?? '');
 if ($secret !== '') {
   $token    = (string)($_POST['recaptcha_token'] ?? $_POST['g-recaptcha-response'] ?? '');
   $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
-
   $ok = false;
   if ($token !== '') {
     $ch = curl_init('https://www.google.com/recaptcha/api/siteverify');
     curl_setopt_array($ch, [
       CURLOPT_POST           => true,
-      CURLOPT_POSTFIELDS     => http_build_query([
-        'secret'   => $secret,
-        'response' => $token,
-        'remoteip' => $remoteIp,
-      ]),
+      CURLOPT_POSTFIELDS     => http_build_query(['secret'=>$secret,'response'=>$token,'remoteip'=>$remoteIp]),
       CURLOPT_RETURNTRANSFER => true,
       CURLOPT_TIMEOUT        => 10,
     ]);
@@ -91,8 +86,7 @@ if ($secret !== '') {
       error_log('reCAPTCHA curl error: '.$cerr);
     }
   }
-
-  if (!$ok) { header('Location: /auth/?mode=register&e=captcha'); exit; }
+  if (!$ok) { header('Location: /auth/?mode=register&e=captcha', true, 302); exit; }
 }
 
 // --- Validasi server-side ---
@@ -102,7 +96,7 @@ if (!valid_name($name)
     || !is_indo_phone($phone)
     || !strong_pw($pw)
     || $pw !== $pw2) {
-  header('Location: /auth/?mode=register&e=invalid'); exit;
+  header('Location: /auth/?mode=register&e=invalid', true, 302); exit;
 }
 
 $phone_e164 = normalize_e164($phone);
@@ -115,7 +109,7 @@ try {
   $st = $db->prepare("SELECT id FROM users WHERE email=:e LIMIT 1");
   $st->execute([':e'=>$email]);
   if ($st->fetchColumn()) {
-    header('Location: /auth/?mode=register&e=exists'); exit;
+    header('Location: /auth/?mode=register&e=exists', true, 302); exit;
   }
 
   // Simpan
@@ -151,12 +145,10 @@ try {
     'auth'  => 'password',
   ];
 
-  // Sanitasi $next agar tetap internal
-  $dest = '/pages/portal';
-  if ($next !== '' && $next[0] === '/' && !str_starts_with($next, '//') && !preg_match('/^[a-z][a-z0-9+\-.]*:/i', $next)) {
-    $dest = $next;
-  }
-  header('Location: '.$dest); exit;
+  // Tentukan tujuan akhir (next aman > dashboard untuk admin/editor > portal)
+  $dest = auth_default_destination($_SESSION['user'], $next);
+  header('Location: '.$dest, true, 302);
+  exit;
 
 } catch (Throwable $e) {
   error_log('register error: '.$e->getMessage());

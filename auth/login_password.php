@@ -45,6 +45,10 @@ $u = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$u || !in_array(($u['status'] ?? 'active'), ['active'], true)) {
   rate_limit_hit($bucket, $MAX, $WIN);
+  audit_log('auth','login_failed', [
+    'message' => 'Login diblokir/ tidak aktif',
+    'meta'    => ['email'=>$email, 'reason'=>'inactive']
+  ]);
   header('Location: /auth/?e=' . ($u ? 'inactive' : 'login')); exit;
 }
 
@@ -52,6 +56,10 @@ if (!$u || !in_array(($u['status'] ?? 'active'), ['active'], true)) {
 $ok = password_verify($pw, (string)$u['password_hash']);
 if (!$ok) {
   rate_limit_hit($bucket, $MAX, $WIN);
+  audit_log('auth','login_failed', [
+    'message' => 'Login password gagal',
+    'meta'    => ['email'=>$email, 'reason'=>'invalid_credentials']
+  ]);
   header('Location: /auth/?e=login'); exit;
 }
 
@@ -71,9 +79,16 @@ rate_limit_reset($bucket);
 $_SESSION['user'] = [
   'id'    => (int)$u['id'],
   'email' => (string)$u['email'],
-  'name'  => (string)($u['name'] ?? ''),
-  'role'  => (string)($u['role'] ?? 'user'),
+  'name'  => (string)$u['name'],
+  'role'  => strtolower((string)$u['role'] ?? 'user'),
+  'auth'  => 'password',
 ];
+
+/* ---- Audit sukses ---- */
+audit_log('auth','login_success', [
+  'message' => 'Login password berhasil',
+  'meta'    => ['email'=>$u['email']]
+]);
 
 /* Update last_login info */
 try {
@@ -84,5 +99,6 @@ try {
 } catch (Throwable $e) { /* ignore */ }
 
 /* Redirect */
-header('Location: ' . $next, true, 302);
+$next = $_POST['next'] ?? $_GET['next'] ?? null;
+header('Location: '.auth_default_destination($_SESSION['user'], $next), true, 302);
 exit;

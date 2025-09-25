@@ -2,53 +2,86 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../lib/app.php';
 app_boot();
+
+// CSRF
+if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+  header('Location: /auth/forgot.php'); exit;
+}
+
+$selector = (string)($_POST['selector'] ?? '');
+$token    = (string)($_POST['token'] ?? '');
+$pw       = (string)($_POST['password'] ?? '');
+$pw2      = (string)($_POST['password_confirm'] ?? '');
+
+function strong_pw(string $pw): bool {
+  return (bool)preg_match('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/', $pw);
+}
+function password_hash_safe(string $pw): string {
+  return password_hash($pw, defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT);
+}
+
+if ($pw === '' || $pw !== $pw2 || !strong_pw($pw)) {
+  header('Location: /auth/forgot.php'); exit;
+}
+
+// Validasi token
+if (!ctype_xdigit($selector) || !ctype_xdigit($token) || strlen($selector)!==16 || strlen($token)!==64) {
+  header('Location: /auth/forgot.php'); exit;
+}
+
 $db = db();
+$st = $db->prepare("SELECT id, user_id, verifier_hash, expires_at, used FROM password_resets WHERE selector=:s LIMIT 1");
+$st->execute([':s'=>$selector]);
+$row = $st->fetch(PDO::FETCH_ASSOC);
 
-if (!hash_equals($_SESSION['csrf'] ?? '', (string)($_POST['csrf'] ?? ''))) {
-  header('Location: /auth/reset.php?e=csrf'); exit;
+if (!$row || (int)$row['used'] === 1 || strtotime((string)$row['expires_at']) <= time()) {
+  header('Location: /auth/forgot.php'); exit;
+}
+if (!hash_equals((string)$row['verifier_hash'], hash('sha256',$token))) {
+  header('Location: /auth/forgot.php'); exit;
 }
 
-$token = (string)($_POST['token'] ?? '');
-$pw1   = (string)($_POST['password'] ?? '');
-$pw2   = (string)($_POST['password2'] ?? '');
+$userId = (int)$row['user_id'];
 
-if (!ctype_xdigit($token) || strlen($token)!==64) {
-  header('Location: /auth/reset.php?e=token'); exit;
-}
-if ($pw1 === '' || $pw1 !== $pw2 || strlen($pw1) < 8) {
-  header('Location: /auth/reset.php?token='.urlencode($token).'&e=pw'); exit;
-}
-
-$hash = hash('sha256', $token);
-
-// cari token
-$st = $db->prepare("SELECT * FROM password_resets WHERE token_hash=:h AND used_at IS NULL AND expires_at>NOW() ORDER BY id DESC LIMIT 1");
-$st->execute([':h'=>$hash]);
-$row = $st->fetch();
-if (!$row) {
-  header('Location: /auth/reset.php?e=expired'); exit;
-}
-
-// update password user
-$db->beginTransaction();
+// Update password & tandai token terpakai
 try {
-  $uid = (int)$row['user_id'];
-  $ph  = password_hash($pw1, PASSWORD_DEFAULT);
+  $db->beginTransaction();
 
-  $db->prepare("UPDATE users SET password_hash=:p, updated_at=NOW() WHERE id=:u")->execute([':p'=>$ph, ':u'=>$uid]);
-  $db->prepare("UPDATE password_resets SET used_at=NOW() WHERE id=:id")->execute([':id'=>$row['id']]);
+  $up = $db->prepare("UPDATE users SET password_hash=:ph, updated_at=NOW() WHERE id=:id");
+  $up->execute([':ph'=>password_hash_safe($pw), ':id'=>$userId]);
+
+  $use = $db->prepare("UPDATE password_resets SET used=1 WHERE id=:id");
+  $use->execute([':id'=>(int)$row['id']]);
+
+  // (opsional) hapus token lain milik user
+  $del = $db->prepare("DELETE FROM password_resets WHERE user_id=:uid AND used=0");
+  $del->execute([':uid'=>$userId]);
 
   $db->commit();
 
   if (function_exists('audit_log')) {
-    audit_log('auth','password_reset_ok',['message'=>'Reset password sukses','meta'=>['user_id'=>$uid,'email'=>$row['email']]]);
+    audit_log('auth','reset_password', ['message'=>'Reset password sukses', 'meta'=>['user_id'=>$userId]]);
   }
-
-  header('Location: /auth/?reset=ok'); exit;
 } catch (Throwable $e) {
   $db->rollBack();
-  if (function_exists('audit_log')) {
-    audit_log('auth','password_reset_fail',['message'=>'Reset password gagal','meta'=>['err'=>$e->getMessage()]]);
-  }
-  header('Location: /auth/reset.php?token='.urlencode($token).'&e=internal'); exit;
+  error_log('reset_post error: '.$e->getMessage());
+  render_error(500, 'Terjadi kesalahan.'); exit;
 }
+
+// Auto-login user
+$st = $db->prepare("SELECT id, email, name, role FROM users WHERE id=:id LIMIT 1");
+$st->execute([':id'=>$userId]);
+$u = $st->fetch(PDO::FETCH_ASSOC);
+
+if ($u) {
+  $_SESSION['user'] = [
+    'id'    => (int)$u['id'],
+    'email' => (string)$u['email'],
+    'name'  => (string)$u['name'],
+    'role'  => strtolower((string)$u['role'] ?? 'user'),
+    'auth'  => 'password',
+  ];
+}
+
+header('Location: ' . auth_default_destination($_SESSION['user'] ?? null, null), true, 302);
+exit;
