@@ -46,7 +46,7 @@ try {
   require_once $BASE . '/lib/session.php';
   require_once $BASE . '/lib/db.php';
   require_once $BASE . '/lib/auth.php';
-  session_boot();
+  app_boot();
 
   // Hanya admin/editor yang boleh akses data audit
   $role = $_SESSION['user']['role'] ?? 'user';

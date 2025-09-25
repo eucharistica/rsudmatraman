@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 3) . '/lib/app.php';
-session_boot();
+app_boot();
 $db = db();
 rbac_require_roles($db, ['admin']);
 
@@ -48,7 +48,7 @@ $csrf = $_SESSION['csrf'];
   <title>Dashboard — Kelola Pengguna</title>
   <meta name="theme-color" content="#38bdf8" />
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
 <body

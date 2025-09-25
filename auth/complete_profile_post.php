@@ -1,9 +1,7 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../lib/session.php';
-require_once __DIR__ . '/../lib/db.php';
-require_once __DIR__ . '/../lib/audit.php';
-session_boot();
+require_once __DIR__ . '/../lib/app.php';
+app_boot();
 
 if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
   header('Location: /auth/complete_profile.php?e=csrf'); exit;

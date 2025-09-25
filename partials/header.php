@@ -19,6 +19,7 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
 ?>
 <header
   x-data="megaMenu();"
+  x-init="init()"
   class="sticky top-0 z-50 border-b border-gray-200/60 bg-white dark:border-gray-800/60 dark:bg-gray-900"
 >
   <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
@@ -110,34 +111,35 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
     </div>
   </div>
 
-  <!-- Backdrop: DESKTOP → mulai dari bawah header (top-16) agar header tetap bisa di-hover -->
-  <div x-show="open && !isMobile"
-      x-transition.opacity
-      class="fixed inset-x-0 bottom-0 top-16 z-40 bg-black/40"
-      @click="close()">
+  <!-- Backdrop: DESKTOP -->
+  <div x-cloak x-show="open && !isMobile"
+     x-transition.opacity
+     class="fixed inset-x-0 bottom-0 top-16 z-40 bg-black/40"
+     @click="close()">
   </div>
 
-  <!-- Backdrop: MOBILE → full screen -->
-  <div x-show="open && isMobile"
-      x-transition.opacity
-      class="fixed inset-0 z-40 bg-black/60"
-      @click="close()">
+  <!-- Backdrop: MOBILE -->
+  <div x-cloak x-show="open && isMobile"
+     x-transition.opacity
+     class="fixed inset-0 z-40 bg-black/60"
+     @click="close()">
   </div>
 
   <!-- Desktop Mega Panel -->
-  <div x-show="open && !isMobile" x-transition
-      class="fixed inset-x-0 top-16 z-50 mx-auto w-full max-w-5xl px-4"
-      @keydown.escape.window="close()"
-      @click.outside="close()"
-      @mouseleave="close()"> <!-- opsional: auto-tutup saat mouse keluar panel -->
+  <div x-cloak x-show="open && !isMobile" x-transition
+     class="fixed inset-x-0 top-16 z-50 mx-auto w-full max-w-5xl px-4"
+     @keydown.escape.window="close()"
+     @click.outside="close()"
+     @mouseleave="close()">
     <div class="rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-gray-900">
       <div class="flex items-center justify-between px-6 py-4">
         <h3 class="text-lg font-semibold" x-text="activeTitle()"></h3>
         <button @click="close()" class="rounded-lg border px-2 py-1 text-sm dark:border-gray-700">Tutup ✕</button>
       </div>
       <div class="grid grid-cols-1 gap-2 border-t border-gray-100 p-2 dark:border-gray-800 md:grid-cols-2">
-        <template x-for="item in items[active] ?? []" :key="item.text">
+        <template x-for="item in (items[active] || [])" :key="item.text">
           <a :href="item.href"
+            @click="close()"
             class="group flex items-center justify-between rounded-lg px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800">
             <span class="font-medium text-gray-900 group-hover:translate-x-1 transition dark:text-gray-100" x-text="item.text"></span>
             <span class="text-gray-400 group-hover:text-primary transition">→</span>
@@ -148,9 +150,9 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
   </div>
 
   <!-- Mobile Fullscreen -->
-  <div x-show="open && isMobile" x-transition
-       class="fixed inset-0 z-50 grid place-items-start bg-white dark:bg-gray-900"
-       @keydown.escape.window="close()">
+  <div x-cloak x-show="open && isMobile" x-transition
+     class="fixed inset-0 z-50 grid place-items-start bg-white dark:bg-gray-900"
+     @keydown.escape.window="close()">
     <div class="w-full">
       <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
         <div class="flex items-center gap-2">
@@ -173,7 +175,7 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
           <a href="#kontak" class="mt-2 block rounded-lg bg-white px-4 py-3 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800">Kontak</a>
         </div>
         <div x-show="level===1" class="rounded-xl bg-gray-50 p-2 shadow-sm dark:bg-gray-800/40">
-          <template x-for="item in items[active] ?? []" :key="'m'+item.text">
+          <template x-for="item in (items[active] || [])" :key="'m'+item.text">
             <a :href="item.href" class="block rounded-lg bg-white px-4 py-3 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800">
               <span class="font-medium" x-text="item.text"></span>
             </a>
@@ -187,8 +189,7 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
 <script>
   function megaMenu(){
     return {
-      open:false, active:'about', level:0, history:[],
-      get isMobile(){ return window.matchMedia('(max-width: 767px)').matches; },
+      open:false, active:'about', level:0, history:[],isMobile: false,
 
       items:{
         about:[
@@ -217,6 +218,24 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
         ],
       },
 
+      // INIT: set & pantau breakpoint
+      init(){
+        try{
+          var mql = window.matchMedia('(max-width: 767px)');
+          var update = () => { this.isMobile = !!mql.matches; };
+          update();
+          // Listener aman CSP (tanpa arrow)
+          if (mql.addEventListener) mql.addEventListener('change', update);
+          else if (mql.addListener)  mql.addListener(update);
+
+          // Tutup aman bila resize/berubah mode
+          this.$watch('isMobile', (v)=>{ if(!v && this.level!==0) this.level=0; });
+
+          // Pastikan tidak auto-open
+          this.open = false;
+        }catch(e){}
+      },
+
       activeTitle(){
         return this.active==='about' ? 'Tentang Kami'
              : this.active==='services' ? 'Layanan'
@@ -225,30 +244,23 @@ if ($avatar === '' || !preg_match('~^https?://~i', $avatar)) {
 
       isOpen(k){ return this.open && this.active===k && this.level===0; },
 
-      // Klik tab: kalau panel sudah terbuka & beda tab → hanya pindah tab (tidak menutup)
       toggle(k){
-        if (!this.open){
-          this.active = k; this.open = true; this.level = 0; return;
-        }
-        if (this.level !== 0){
-          // sedang di level submenu → balik ke level 0 sambil ganti tab
-          this.level = 0; this.active = k; return;
-        }
-        // panel terbuka di level 0:
+        if (!this.open){ this.active = k; this.open = true; this.level = 0; return; }
+        if (this.level !== 0){ this.level = 0; this.active = k; return; }
         if (this.active === k){ this.close(); } else { this.active = k; }
       },
-
-      // Hover/focus di desktop: buka (kalau belum) dan pindah tab
       hover(k){
         if (this.isMobile) return;
         if (!this.open){ this.open = true; }
         this.level = 0; this.active = k;
       },
-
       openFirst(){ this.active='about'; this.open=true; this.level=0; },
       openSection(k){ this.history.push(this.active); this.active=k; this.level=1; },
-      goBack(){ if(this.level===1){ this.level=0; this.active=this.history.pop()||'about'; } else { this.close(); } },
-      close(){ this.open=false; this.level=0; this.history=[]; },
+      goBack(){
+        if(this.level===1){ this.level=0; this.active=this.history.pop()||'about'; }
+        else { this.close(); }
+      },
+      close(){ this.open=false; this.level=0; this.history=[]; }
     }
   }
 

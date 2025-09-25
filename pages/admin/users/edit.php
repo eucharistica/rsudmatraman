@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__, 3) . '/lib/app.php';
-session_boot();
+app_boot();
 $db = db();
 rbac_require_roles($db, ['admin']);
 

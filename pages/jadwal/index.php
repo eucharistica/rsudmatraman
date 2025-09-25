@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../../lib/session.php';
-session_boot();
+require_once __DIR__ . '/../../lib/app.php';
+app_boot();
 $pageTitle = 'Informasi Jadwal — RSUD Matraman';
 $pageDescription = 'Informasi jadwal praktik dokter di RSUD Matraman';
 ?>

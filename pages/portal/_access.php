@@ -1,10 +1,8 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../lib/session.php';
-require_once __DIR__ . '/../../lib/auth.php';
-require_once __DIR__ . '/../../lib/audit.php';
-session_boot();
+require_once __DIR__ . '/../../lib/app.php';
+app_boot();
 
 $role = auth_role(); 
 

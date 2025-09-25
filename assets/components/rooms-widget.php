@@ -110,7 +110,6 @@
 </section>
 
 <script>
-  // Komponen reusable
   function RoomsWidget(cfg){
     const BASE = (cfg && cfg.baseUrl) || '';
     const API_SUM = BASE + '/kamar';
@@ -123,14 +122,14 @@
       // state utama
       isLoading:true,
       groups:[],
-      lastUpdated:null,       // Date object
+      lastUpdated:null,
 
       // modal
       showModal:false,
       modalTitle:'',
       modalRows:[],
       isLoadingModal:false,
-      lastUpdatedDetail:null, // Date object
+      lastUpdatedDetail:null,
 
       formatTS(d){
         try { return new Date(d).toLocaleString('id-ID', { timeZone:'Asia/Jakarta' }); }
@@ -148,7 +147,7 @@
           const res = await fetch(API_SUM, {headers:{'Accept':'application/json'}});
           const json = await res.json();
           this.groups = json.data || [];
-          this.lastUpdated = new Date(); // waktu pengambilan
+          this.lastUpdated = new Date();
         }catch(e){
           console.error(e); alert('Gagal memuat data kamar.');
         }finally{
@@ -168,7 +167,7 @@
           const res = await fetch(url, {headers:{'Accept':'application/json'}});
           const json = await res.json();
           this.modalRows = json.data || [];
-          this.lastUpdatedDetail = new Date(); // waktu pengambilan detail
+          this.lastUpdatedDetail = new Date();
         }catch(e){
           console.error(e); alert('Gagal memuat detail bangsal.');
         }finally{

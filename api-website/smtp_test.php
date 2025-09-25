@@ -26,7 +26,7 @@ try {
   $BASE = find_base_with_lib(__DIR__);
   if (!$BASE) throw new RuntimeException('Library path not found');
   require_once $BASE . '/lib/app.php';
-  session_boot();
+  app_boot();
   $db = db();
   rbac_require_roles($db, ['admin']);
 

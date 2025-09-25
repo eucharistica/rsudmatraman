@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../lib/session.php';
+require_once __DIR__ . '/../../lib/app.php';
 require_once __DIR__ . '/_access.php';
 
 $TOPBAR_SUBTITLE = 'Portal';
@@ -70,7 +70,7 @@ function role_badge(string $r): string {
 
   <!-- CDN CSS/JS global halaman -->
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">

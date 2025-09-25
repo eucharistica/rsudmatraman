@@ -1,13 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../lib/session.php';
-require_once __DIR__ . '/../lib/auth.php';
-require_once __DIR__ . '/../lib/audit.php';
-
+require_once __DIR__ . '/../lib/app.php';
 $CFG = require __DIR__ . '/../_private/website.php';
 
-session_boot();
+app_boot();
 
 /** Helper: validasi path internal aman untuk ?next */
 function is_safe_next(string $n): bool {

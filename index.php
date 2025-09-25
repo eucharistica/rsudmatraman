@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/lib/session.php';
-session_boot();
+require_once __DIR__ . '/lib/app.php';
+app_boot();
 $pageTitle = 'RSUD Matraman — Rumah Sakit Modern';
 $pageDescription = 'RSUD Matraman: Layanan kesehatan cepat, ramah, dan terpercaya. IGD 24 jam, poliklinik spesialis, lab, rawat inap, jadwal & info kamar real-time.';
 ?>
@@ -158,7 +158,7 @@ $pageDescription = 'RSUD Matraman: Layanan kesehatan cepat, ramah, dan terpercay
               <img :src="n.cover || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=1200&auto=format&fit=crop'" alt="" class="h-40 w-full object-cover" />
               <div class="p-4">
                 <h4 class="line-clamp-2 text-lg font-semibold" x-text="n.title"></h4>
-                <p class="mt-1 text-xs text-gray-500" x-text="new Date(n.date).toLocaleDateString('id-ID')"></p>
+                <p class="mt-1 text-xs text-gray-500" x-text="formatDate(n.date)"></p>
                 <p class="mt-2 line-clamp-3 text-gray-600 dark:text-gray-300" x-text="n.excerpt"></p>
                 <a :href="n.href" class="mt-4 inline-block text-sm font-semibold text-primary">Baca Selengkapnya →</a>
               </div>

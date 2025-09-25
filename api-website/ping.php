@@ -60,7 +60,7 @@ try {
   if ($BASE === null) throw new RuntimeException('Library path not found from: '.__DIR__);
   require_once $BASE . '/lib/session.php';
   require_once $BASE . '/lib/db.php';
-  session_boot();
+  app_boot();
 
   $out = ['ok'=>true, 'db'=>null, 'ext'=>[]];
 

@@ -1,8 +1,5 @@
 <?php
-// /lib/auth.php
 declare(strict_types=1);
-
-require_once __DIR__ . '/session.php';
 
 /** Ambil user saat ini dari session (tidak memanggil session_start bila header sudah terkirim). */
 function auth_current_user(): ?array {

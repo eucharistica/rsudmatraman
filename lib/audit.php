@@ -1,13 +1,6 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/session.php';
-require_once __DIR__ . '/auth.php';
-
-/**
- * Catat audit log (kompatibel MySQL tanpa tipe JSON).
- */
 function audit_log(string $event, string $action, array $opts = []): void {
   try {
     $db = db(); // auto-load cfg (sesuai Opsi 1)

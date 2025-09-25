@@ -120,7 +120,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
         <button @click="close()" class="rounded-lg border px-2 py-1 text-sm dark:border-gray-700">Tutup ✕</button>
       </div>
       <div class="grid grid-cols-1 gap-2 border-t border-gray-100 p-2 dark:border-gray-800 md:grid-cols-2">
-        <template x-for="item in items[active] ?? []" :key="item.text">
+        <template x-for="item in (items[active] || [])" :key="item.text">
           <a :href="item.href" class="group flex items-center justify-between rounded-lg px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800">
             <span class="font-medium text-gray-900 group-hover:translate-x-1 transition dark:text-gray-100" x-text="item.text"></span>
             <span class="text-gray-400 group-hover:text-primary transition">→</span>
@@ -145,7 +145,7 @@ $hdrSticky = $TOPBAR_STICKY ? 'sticky top-0' : '';
           <button class="mt-2 flex w-full items-center justify-between rounded-lg bg-white px-4 py-3 text-left shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800" @click="openSection('sistem')"><span class="font-medium">Sistem</span><span>›</span></button>
         </div>
         <div x-show="level===1" class="rounded-xl bg-gray-50 p-2 shadow-sm dark:bg-gray-800/40">
-          <template x-for="item in items[active] ?? []" :key="'m'+item.text">
+          <template x-for="item in (items[active] || [])" :key="'m'+item.text">
             <a :href="item.href" class="block rounded-lg bg-white px-4 py-3 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800"><span class="font-medium" x-text="item.text"></span></a>
           </template>
         </div>

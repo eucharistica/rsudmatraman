@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../../lib/session.php';
-session_boot();
+require_once __DIR__ . '/../../lib/app.php';
+app_boot();
 $pageTitle = 'Informasi Kamar — RSUD Matraman';
 $pageDescription = 'Informasi ketersediaan tempat tidur rawat inap RSUD Matraman';
 ?>
@@ -13,6 +13,6 @@ $pageDescription = 'Informasi ketersediaan tempat tidur rawat inap RSUD Matraman
   <?php include __DIR__ . '/../../partials/header.php'; ?>
   <?php include __DIR__ . '/../../assets/components/jambesuk-widget.php'; ?>
   <?php include __DIR__ . '/../../assets/components/rooms-widget.php'; ?>
-  <?php include dirname(__DIR__, 2) . '/partials/footer-app.php'; ?>
+  <?php include dirname(__DIR__, 2) . '/partials/footer.php'; ?>
 </body>
 </html>

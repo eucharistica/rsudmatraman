@@ -1,4 +1,3 @@
-<!-- Schedule (AJAX) with filters -->
 <section id="jadwal" class="mx-auto max-w-7xl px-4 py-16">
       <div class="mb-4">
         <h3 class="text-2xl font-bold">Jadwal Praktek Dokter</h3>
@@ -21,11 +20,7 @@
           <label class="mb-1 block text-sm font-medium">Hari</label>
           <select
             x-ref="hariSelect"
-            x-model="filters.hari"
-            x-init="
-              if (!filters.hari) { filters.hari = todayHariUpper(); }
-              $nextTick(() => { $refs.hariSelect.value = filters.hari })
-            "
+            x-model="filters.hari"            
             @change="changeHari($event.target.value)"
             class="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring dark:border-gray-700"
           >
@@ -54,7 +49,7 @@
 
       <!-- Table/Grid -->
       <div class="relative mt-6">
-        <div x-show="isLoadingSchedule" class="absolute inset-0 z-10 grid place-items-center bg-white/60 text-gray-600">Memuat...</div>
+        <div x-show="isLoadingSchedule" class="absolute inset-0 z-10 grid place-items-center bg-white/60 text-gray-600">Memuat</div>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <template x-for="(it, idx) in schedule" :key="idx">
             <div class="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">

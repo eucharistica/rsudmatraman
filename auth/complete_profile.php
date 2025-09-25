@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../lib/session.php';
-session_boot();
+require_once __DIR__ . '/../lib/app.php';
+app_boot();
 
 $err = $_GET['e'] ?? '';
 $msg = [
@@ -26,7 +26,7 @@ $CSRF = $_SESSION['csrf'];
   <title>Lengkapi Profil — RSUD Matraman</title>
 <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
 
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
 <body class="min-h-screen grid place-items-center bg-slate-50 p-4 dark:bg-gray-950 dark:text-gray-100">

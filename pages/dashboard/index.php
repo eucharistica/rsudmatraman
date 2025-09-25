@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../lib/app.php';
-session_boot();
+app_boot();
 $db = db();
 
 $u     = auth_current_user();
@@ -33,7 +33,7 @@ $role  = strtolower((string)($u['role']  ?? 'user'));
   <meta name="theme-color" content="#38bdf8" />
 
   <link rel="stylesheet" href="/assets/components/css/tw.css"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
   <style>*{-webkit-tap-highlight-color:transparent}</style>
 </head>
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">

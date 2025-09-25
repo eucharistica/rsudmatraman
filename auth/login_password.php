@@ -1,128 +1,88 @@
 <?php
 declare(strict_types=1);
-
 require_once __DIR__ . '/../lib/app.php';
+app_boot();
 
-session_boot();
-
-/* Helper: validasi path internal aman untuk ?next */
+/** NEXT internal path validator */
 function is_safe_next(string $n): bool {
-  if ($n === '' || $n[0] !== '/') return false;                 // harus path absolut internal
-  if (str_contains($n, "\r") || str_contains($n, "\n")) return false; // cegah header injection
-  if (str_starts_with($n, '//')) return false;                  // protocol-relative
-  if (preg_match('/^[a-z][a-z0-9+\-.]*:/i', $n)) return false;  // URL absolut (http:, js:, dll)
-  return true;
+  if ($n === '' || $n[0] !== '/') return false;
+  if (str_contains($n, "\r") || str_contains($n, "\n")) return false;
+  if (str_starts_with($n, '//')) return false;
+  if (preg_match('~^[a-z][a-z0-9+.\-]*:~i', $n)) return false;
+  return (bool)preg_match("#^/[A-Za-z0-9._~!$&()*,;=:@%/\-]*$#", $n);
 }
 
-/* ---- CSRF ---- */
+/* ===== CSRF ===== */
 if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+  http_response_code(400); exit('CSRF invalid');
+}
+
+/* ===== Input ===== */
+$next  = isset($_POST['next']) && is_safe_next((string)$_POST['next']) ? (string)$_POST['next'] : '/pages/portal';
+$email = strtolower(trim((string)($_POST['email'] ?? '')));
+$pw    = (string)($_POST['password'] ?? '');
+
+if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $pw === '') {
   header('Location: /auth/?e=invalid'); exit;
 }
 
-/* ---- Input ---- */
-$email = strtolower(trim((string)($_POST['email'] ?? '')));
-$pw    = (string)($_POST['password'] ?? '');
-$next  = (string)($_POST['next'] ?? '/pages/portal');
-if (!is_safe_next($next)) $next = '/pages/portal';
+$db = db();
 
-/* ---- reCAPTCHA (opsional) ---- */
-$CFG = require __DIR__ . '/../_private/website.php';
-$secret = (string)($CFG['RECAPTCHA_SECRET_KEY'] ?? '');
-if ($secret !== '') {
-  $resp = (string)($_POST['g-recaptcha-response'] ?? '');
-  $ok = false;
-  if ($resp !== '') {
-    if (function_exists('curl_init')) {
-      $ch = curl_init('https://www.google.com/recaptcha/api/siteverify');
-      curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => http_build_query(['secret'=>$secret,'response'=>$resp]),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 10,
-      ]);
-      $body = curl_exec($ch); curl_close($ch);
-    } else {
-      $ctx = stream_context_create([
-        'http'=>[
-          'method'=>'POST',
-          'header'=>"Content-Type: application/x-www-form-urlencoded\r\n",
-          'content'=>http_build_query(['secret'=>$secret,'response'=>$resp]),
-          'timeout'=>10,
-        ]
-      ]);
-      $body = @file_get_contents('https://www.google.com/recaptcha/api/siteverify', false, $ctx);
-    }
-    $j = @json_decode((string)$body, true);
-    $ok = (bool)($j['success'] ?? false);
-  }
-  if (!$ok) { header('Location: /auth/?e=captcha&next='.urlencode($next)); exit; }
+/* ===== Rate limit (IP + email) ===== */
+$ip    = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+$bucket= 'login:pwd:' . $ip . ':' . $email;
+$MAX   = 5;     // maksimum percobaan
+$WIN   = 600;   // jendela 10 menit
+
+if (!rate_limit_allow($bucket, $MAX, $WIN)) {
+  header('Location: /auth/?e=rate'); exit;
 }
 
-/* ---- DB & query user ---- */
-$db = db(); // Opsi 1: auto-load config di lib/db.php
+/* ===== Lookup user ===== */
+$stmt = $db->prepare("SELECT id, email, name, role, status, password_hash FROM users WHERE email=:e LIMIT 1");
+$stmt->execute([':e' => $email]);
+$u = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$st = $db->prepare("SELECT id,email,name,password_hash,role,status FROM users WHERE email = :e LIMIT 1");
-$st->execute([':e'=>$email]);
-$user = $st->fetch(PDO::FETCH_ASSOC);
-
-if (!login_throttle_check()) {
-    header('Location: /auth/?e=locked'); exit;
+if (!$u || !in_array(($u['status'] ?? 'active'), ['active'], true)) {
+  rate_limit_hit($bucket, $MAX, $WIN);
+  header('Location: /auth/?e=' . ($u ? 'inactive' : 'login')); exit;
 }
 
-/* ---- Verifikasi kredensial ---- */
-if (!$user || empty($user['password_hash']) || !password_verify($pw, (string)$user['password_hash'])) {
-  audit_log('auth','login_failed', [
-    'message' => 'Login password gagal',
-    'meta'    => ['email'=>$email, 'reason'=>'invalid_credentials']
-  ]);
-  login_throttle_fail();
-  header('Location: /auth/?e=login&next='.urlencode($next)); exit;
-}
-if (($user['status'] ?? 'active') !== 'active') {
-  audit_log('auth','login_failed', [
-    'message' => 'Login diblokir/ tidak aktif',
-    'meta'    => ['email'=>$email, 'reason'=>'inactive']
-  ]);
-  header('Location: /auth/?e=inactive'); exit;
+/* ===== Verify password ===== */
+$ok = password_verify($pw, (string)$u['password_hash']);
+if (!$ok) {
+  rate_limit_hit($bucket, $MAX, $WIN);
+  header('Location: /auth/?e=login'); exit;
 }
 
-/* ---- Update meta login ---- */
+/* Upgrade hash bila perlu */
 try {
-  $db->prepare("UPDATE users SET last_login = NOW(), provider='password', updated_at=NOW() WHERE id=:id")
-     ->execute([':id'=>$user['id']]);
-} catch (\Throwable $e) {
-  error_log('login_password last_login update: '.$e->getMessage());
-  // tidak memblokir login
-}
+  if (password_needs_rehash((string)$u['password_hash'], PASSWORD_DEFAULT)) {
+    $new = password_hash($pw, PASSWORD_DEFAULT);
+    $upd = $db->prepare("UPDATE users SET password_hash=:h, updated_at=NOW() WHERE id=:id");
+    $upd->execute([':h' => $new, ':id' => (int)$u['id']]);
+  }
+} catch (Throwable $e) { /* ignore */ }
 
-/* ---- Set session ---- */
-session_regenerate_id(true);
+/* Sukses → reset counter */
+rate_limit_reset($bucket);
+
+/* Set session */
 $_SESSION['user'] = [
-  'id'    => (int)$user['id'],
-  'email' => (string)$user['email'],
-  'name'  => (string)$user['name'],
-  'role'  => strtolower((string)$user['role'] ?? 'user'),
-  'auth'  => 'password',
+  'id'    => (int)$u['id'],
+  'email' => (string)$u['email'],
+  'name'  => (string)($u['name'] ?? ''),
+  'role'  => (string)($u['role'] ?? 'user'),
 ];
 
-/* ---- Audit sukses ---- */
-audit_log('auth','login_success', [
-  'message' => 'Login password berhasil',
-  'meta'    => ['email'=>$user['email']]
-]);
+/* Update last_login info */
+try {
+  $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+  $ip = substr($ip, 0, 45);
+  $upd = $db->prepare("UPDATE users SET last_login = NOW(), last_login_ip=:ip, last_login_ua=:ua WHERE id=:id");
+  $upd->execute([':ip'=>$ip, ':ua'=>$ua, ':id'=>(int)$u['id']]);
+} catch (Throwable $e) { /* ignore */ }
 
-/* ---- Tentukan tujuan ---- */
-$role = $_SESSION['user']['role'];
-$default = in_array($role, ['admin','editor'], true) ? '/pages/dashboard' : '/pages/portal';
-if ($next === '/pages/dashboard' && !in_array($role, ['admin','editor'], true)) {
-  $next = '/pages/portal';
-}
-$dest = $next ?: $default;
-
-/* ---- Redirect & fallback ---- */
-$didHeader = @header('Location: ' . $dest, true, 303);
-if ($didHeader !== false) { exit; }
-?>
-<!doctype html>
-<meta http-equiv="refresh" content="0;url=<?= htmlspecialchars($dest, ENT_QUOTES) ?>">
-<a href="<?= htmlspecialchars($dest, ENT_QUOTES) ?>">Lanjutkan…</a>
+/* Redirect */
+header('Location: ' . $next, true, 302);
+exit;

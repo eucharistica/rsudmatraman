@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__, 3) . '/lib/app.php';
-session_boot();
+app_boot();
 $db = db();
 rbac_require_roles($db, ['admin']);
 if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
@@ -14,7 +14,7 @@ $csrf = $_SESSION['csrf'];
   <title>Konfigurasi — Dashboard Admin</title>
   <link rel="icon" href="/assets/img/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="/assets/components/css/tw.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100"
       x-data="configPage('<?= htmlspecialchars($csrf, ENT_QUOTES) ?>')"
